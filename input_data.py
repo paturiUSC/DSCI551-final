@@ -34,10 +34,10 @@ def processAndPartitionInput(file_location):
     # Process a txt file
     elif file_location[-3:] == "txt":
         txt_file_delimiter = input("Enter the delimiter for the inputted txt file: ")
-        while txt_file_delimiter != "":
+        while not txt_file_delimiter:
             txt_file_delimiter = input("Enter the delimiter for the inputted txt file: ")
         
-        file_df = pd.read_csv(file_location, sep=txt_file_delimiter)
+        file_df = pd.read_csv(file_location, sep=txt_file_delimiter, engine='python')
         output_df_and_column_headers.append(file_df)
         # Get the column headers
         file_columns = getColumnHeaders(file_df)
@@ -65,10 +65,11 @@ def getColumnHeaders(file_df):
 def partitionInput(file_location): 
     partitionedDataFileNames = []
 
+    chunk_size = 2000
     print("The determined chunk size is 2000 to have 2000 rows of data per partitioned dataset.")
 
     # partition into different CSV files 
-    for i, chunk in enumerate(pd.read_csv(file_location, chunksize=50)):
+    for i, chunk in enumerate(pd.read_csv(file_location, chunksize=chunk_size)):
         new_file_name = './DSCI551-final/Output-Data/chunk{}.csv'.format(i)
         chunk.to_csv(new_file_name, index=False)
         partitionedDataFileNames.append(new_file_name)
