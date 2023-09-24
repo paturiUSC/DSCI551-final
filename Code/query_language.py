@@ -53,9 +53,19 @@ def deleteData(column_headers):
     while (not user_delete_input) or (user_delete_input[-1:] != ";"): 
         user_delete_input = input(">")
     
+    if ("exit" in user_delete_input):
+        return ""
+    
     user_delete_input = user_delete_input.lower()
 
+    if not os.path.exists("./DSCI551-final/Output-Data"):
+            os.makedirs("./DSCI551-final/Output-Data")
+
     directory_data_files = os.listdir("./DSCI551-final/Output-Data")
+
+    if len(directory_data_files) == 0:
+        print("No data in the database right now.")
+        return ""
 
     # Delete all data
     if "all" in user_delete_input and "from" not in user_delete_input: 
@@ -86,10 +96,11 @@ def deleteData(column_headers):
         # Find all matches in the input text
         matches = re.findall(pattern, user_delete_input, re.IGNORECASE)
 
-        # Extract and print the matched phrases, along with words/values before and after
-        df_filter_expression = None
-
+        # Apply delete input on each file/table in the database
         for file in directory_data_files: 
+            # Extract and print the matched phrases, along with words/values before and after
+            df_filter_expression = None
+
             file_path = "./DSCI551-final/Output-Data/" + file
 
             file_df = pd.read_csv(file_path)
@@ -102,39 +113,36 @@ def deleteData(column_headers):
                 
                 print(f"These are the identified key tokens from the command:'{column}' {comparison_phrase} '{value}'")
 
+                # Construct the DataFrame filter expressions
                 if column in column_headers:
                     # Construct a filter expression
                     if comparison_phrase == '=':
                         value = int(value)
                         condition = (file_df[column] == value)
-                        # print(condition)
                     elif comparison_phrase == '<':
                         value = int(value)
                         condition = (file_df[column] < value)
-                        # print(condition)
                     elif comparison_phrase == '>':
                         value = int(value)
                         condition = (file_df[column] > value)
-                        # print(condition)
                     elif comparison_phrase == '<=':
                         value = int(value)
                         condition = (file_df[column] <= value)
-                        # print(condition)
                     elif comparison_phrase == '>=':
                         value = int(value)
                         condition = (file_df[column] >= value)
-                        # print(condition)
                     elif comparison_phrase == 'like':
                         condition = file_df[column].str.contains(value, case=False)
-                        # print(condition)
                     
-                    # Combine conditions using logical 'and'
+                    # Combine the filter expression conditions using logical 'and'
                     if df_filter_expression is None:
                         df_filter_expression = condition
-                    # else:
-                    #     df_filter_expression = df_filter_expression & condition
+                    else:
+                        df_filter_expression = df_filter_expression & condition
                 else: 
                     print("The column", column, "is not a valid column. So, not going to delete rows based on that condition.")
+
+            # Apply the identified filter expression
             if df_filter_expression is not None:
                 print("This is the identified filter expression.")
                 print(df_filter_expression)
