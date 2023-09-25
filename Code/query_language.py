@@ -34,6 +34,9 @@ def useDatabase():
 def selectData(): 
     return ""
 
+def updateData(): 
+    return ""
+
 def insertData(): 
     # Display the example prompts for the user
     print("\nHere are 2 example prompts to insert data into the database. Use a semicolon ';' to end the command.")
@@ -255,10 +258,7 @@ def insertData():
     else: 
         print("Please enter a valid insert statement next time.")
 
-def updateData(): 
-    return ""
-
-def deleteData(column_headers): 
+def deleteData(): 
     # Display the example prompts for the user
     print("\nHere are 3 example prompts to delete data from the database. Use a semicolon ';' to end the command.")
     print("Option 1 (deleting all data from user-generated and pre-partitioned tables): Delete all;")
@@ -326,6 +326,7 @@ def deleteData(column_headers):
 
             file_df = pd.read_csv(file_path)
             original_length = len(file_df)
+            column_headers = file_df.columns
 
             for match in matches:
                 column = match[0]
@@ -385,7 +386,7 @@ def deleteData(column_headers):
 
     print("\nDelete data operation complete!")
 
-def menu_option_action(menu_option, column_headers):
+def menu_option_action(menu_option):
     if menu_option == "a": 
         print("You've chosen to select data.")
         selectData()
@@ -410,13 +411,13 @@ def menu_option_action(menu_option, column_headers):
 
     elif menu_option == "d":
         print("You've chosen to delete data.")
-        deleteData(column_headers)
+        deleteData()
 
     else: 
         print("Invalid menu option!")
 
 if __name__ == "__main__":
-    column_headers = ['date', 'open', 'high', 'low', 'close', 'volume', 'Name']
+    # column_headers = ['date', 'open', 'high', 'low', 'close', 'volume', 'Name'] 
 
     # See if the user wants to use the database
     use_database_input = useDatabase()
@@ -425,7 +426,7 @@ if __name__ == "__main__":
     while use_database_input:
         menu_option = displayUserMenu()
 
-        menu_option_action(menu_option, column_headers)
+        menu_option_action(menu_option)
 
         use_database_input = useDatabase()
 
