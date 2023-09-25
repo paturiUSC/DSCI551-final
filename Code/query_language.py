@@ -34,7 +34,80 @@ def selectData():
     return ""
 
 def insertData(): 
-    return ""
+    # Display the example prompts for the user
+    print("\nHere are 2 example prompts to insert data into the database. Use a semicolon ';' to end the command.")
+    print("Option 1 (inserting a table): Insert table table_name (a int, b str, c float);")
+    print("Option 2 (inserting ONE row into a table): Insert row in table_name (value1, value2, value3);")
+    print("For Option 2, make sure to have the correct datatype for each column value. A null value will be inserted for missing fields. Make sure 'row' is in the command ONLY for inserting a row and 'table' is in the command ONLY for inserting a new table.")
+    
+    print("\nExit out at anytime by typing 'exit;'")
+
+    # Get and validate user input
+    user_insert_input = input(">")
+
+    while (not user_insert_input) or (user_insert_input[-1:] != ";"): 
+        user_insert_input = input(">")
+    
+    if ("exit" in user_insert_input):
+        return ""
+    
+    user_insert_input = user_insert_input.lower()
+
+    if not os.path.exists("./DSCI551-final/Output-Data"):
+            os.makedirs("./DSCI551-final/Output-Data")
+
+    # Create a new table
+    if "table" in user_insert_input: 
+        pattern = r"Insert\s+table\s+(\w+)\s*\((.*?)\)"
+
+        # Match the pattern to the user inpitted command
+        match = re.match(pattern, user_insert_input, re.IGNORECASE)
+
+        if match:
+            # Find the name of the newly created table
+            table_name = match.group(1)  
+
+            # Split the column headers
+            column_info = {}
+            parameters_str = match.group(2)  
+            parameters = [param.strip() for param in parameters_str.split(',')]
+            for parameter in parameters: 
+                column_info_list = parameter.split()
+                column_info[column_info_list[0]] = column_info_list[1]
+
+            # Show output to user 
+            print("Here is the extracted table name", table_name)
+            print("Here is the extracted table columns", column_info)
+
+            # Create empty DataFrame with specified column names and data types
+            new_table_df = pd.DataFrame(columns=column_info.keys())
+
+            # Set data types for each user inputted column
+            for column, dtype in column_info.items():
+                new_table_df[column] = new_table_df[column].astype(dtype)
+            
+            # Export the DataFrame as a .csv to store the data
+            new_table_file_name = './DSCI551-final/Output-Data/' + table_name + '.csv'
+            new_table_df.to_csv(new_table_file_name, index=False)
+
+            # Show output to user
+            print("The table", table_name, "has been created and inserted into the database.")
+            print("Here is the file path of the newly created table", new_table_file_name)
+
+        else: 
+            print("The table name and/or parameters could not be identified.")
+            print("Please enter a valid insert statement similar to the provided examples.")
+
+        print("Insert data operation complete!")
+
+    # Insert a row of data 
+    elif "row" in user_insert_input: 
+        return ""
+
+    else: 
+        print("Please enter a valid insert statement next time.")
+
+    print("\nInsert/create data operation complete!")
 
 def updateData(): 
     return ""
@@ -46,6 +119,8 @@ def deleteData(column_headers):
     print("Option 2 (deleting specific rows based on a comparison/rule AND make sure column name is right before the comparison): Delete rows where stock_price > than 50;")
     print("For Option 2, make sure to type out the comparison explicity: '=', '>', '>=', '<',  '<=', or 'like' (for strings).")
     print("Option 3 (deleting user-generated table): Delete all from table_name;\n")
+
+    print("\nExit out at anytime by typing 'exit;'")
 
     # Get and validate user input
     user_delete_input = input(">")
@@ -143,6 +218,7 @@ def deleteData(column_headers):
                     print("The column", column, "is not a valid column. So, not going to delete rows based on that condition.")
 
             # Apply the identified filter expression
+            # Show output to user
             if df_filter_expression is not None:
                 print("This is the identified filter expression.")
                 print(df_filter_expression)
@@ -184,10 +260,6 @@ def menu_option_action(menu_option, column_headers):
     elif menu_option == "d":
         print("You've chosen to delete data.")
         deleteData(column_headers)
-
-        # delete all (including newly created table files)
-        # delete specific data
-        # delete tables you've created (which are stored in separate files)
 
     else: 
         print("Invalid menu option!")
