@@ -73,11 +73,11 @@ def partitionInput(file_location):
     # Getting available virtual_memory in GB
     available_ram_gb = psutil.virtual_memory()[1]/1000000000
     print('RAM Available (GB):', available_ram_gb)
-    chunk_size = int(available_ram_gb * 100)
-    print("The determined chunk size is", chunk_size, "and so there will be", chunk_size ,"rows of data per partitioned dataset.\n\n")
+    memory_size = int(available_ram_gb * 1000)
+    print("The determined chunk size is", memory_size, "and so there will be", memory_size ,"rows of data per partitioned dataset.\n\n")
 
     # partition into different CSV files 
-    for i, chunk in enumerate(pd.read_csv(file_location, chunksize=chunk_size)):
+    for i, chunk in enumerate(pd.read_csv(file_location, chunksize=memory_size)):
         new_file_name = './Output-Data/chunk{}.csv'.format(i)
         chunk.to_csv(new_file_name, index=False)
         partitionedDataFileNames.append(new_file_name)
