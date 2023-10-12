@@ -3,6 +3,17 @@ import pandas as pd
 import numpy as np
 import re
 
+
+# to - do 
+    # select 
+    # update 
+    # insert/delete
+        # remove/insert into whole dataset or partitioned tables 
+    # insert 
+        # only insert into partition if it's number of rows is less than the memory size
+            # if it is more than the memory size, create a new partition based on the partition 
+    
+
 def displayUserMenu(): 
     print("What would you like to do? Please enter the corresponding number of the operation you would like to perform.")
     print("A. Select Data (including joins)")

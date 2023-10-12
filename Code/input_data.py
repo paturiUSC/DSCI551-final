@@ -2,6 +2,9 @@ import pandas as pd
 import os 
 import psutil
 
+# to - do
+    # create directory of the dataset where partitioned tables are csv files under that directory
+
 # Function to get the user input
 def get_user_input_file():
     print("Welcome to the database! For this database, please enter the file location of the data you would like to upload to the database.")
