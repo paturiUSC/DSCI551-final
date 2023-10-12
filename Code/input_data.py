@@ -1,15 +1,17 @@
 import pandas as pd
 import os 
+import psutil
 
 # Function to get the user input
 def get_user_input_file():
     print("Welcome to the database! For this database, please enter the file location of the data you would like to upload to the database.")
     print("Please ensure the data is structured. This database acts like a relational database handling structured data.")
-    print("Please only input a .csv file.")
+    print("Please only input a .csv file. Please enter 'exit' to exit the system.\n")
     file_location = input(">")
-    while not os.path.exists(file_location): 
-        file_location = input("Please enter a file path location for the structued data: ")
-    print("Thank you for entering the file location path. Accessing now ...")
+    if file_location != "exit":
+        while not os.path.exists(file_location) and (file_location != "exit"): 
+            file_location = input("Please enter a valid file path location for the structued data: ")
+        print("Thank you for entering the file location path. Accessing now ...")
     return file_location
 
 # Function to process and partition the user inputted data file
@@ -65,15 +67,21 @@ def getColumnHeaders(file_df):
 def partitionInput(file_location): 
     partitionedDataFileNames = []
 
-    chunk_size = 2000
-    print("The determined chunk size is 2000 to have 2000 rows of data per partitioned dataset.")
+     
+    # Output % usage of virtual_memory 
+    print('\nRAM memory % used:', psutil.virtual_memory()[2])
+    # Getting available virtual_memory in GB
+    available_ram_gb = psutil.virtual_memory()[1]/1000000000
+    print('RAM Available (GB):', available_ram_gb)
+    chunk_size = available_ram_gb * 100
+    print("The determined chunk size is", chunk_size, "and so there will be", chunk_size ,"rows of data per partitioned dataset.\n")
 
     # partition into different CSV files 
     for i, chunk in enumerate(pd.read_csv(file_location, chunksize=chunk_size)):
         new_file_name = './DSCI551-final/Output-Data/chunk{}.csv'.format(i)
         chunk.to_csv(new_file_name, index=False)
         partitionedDataFileNames.append(new_file_name)
-        print("Created", new_file_name)
+        print("\nCreated", new_file_name)
     
     return partitionedDataFileNames
 
@@ -81,8 +89,12 @@ if __name__ == "__main__":
     # Get the user input data 
     file_location = get_user_input_file()
 
-    # Download the data into a csv file
-    # Partition the dataset and return the location + names of the partitioned files
-    processed_and_partitioned_input_data = processAndPartitionInput(file_location)
-
-    print(processed_and_partitioned_input_data)
+    if (file_location != "exit"):
+        # Download the data into a csv file
+        # Partition the dataset and return the location + names of the partitioned files
+        processed_and_partitioned_input_data = processAndPartitionInput(file_location)
+        
+        print("\n\n\n")
+        print(processed_and_partitioned_input_data)
+    else: 
+        print("Exited the database!")
