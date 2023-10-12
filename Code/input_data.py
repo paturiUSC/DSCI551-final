@@ -82,7 +82,7 @@ def partitionInput(file_location):
         chunk.to_csv(new_file_name, index=False)
         partitionedDataFileNames.append(new_file_name)
         print("Created", new_file_name)
-    
+     
     return partitionedDataFileNames
 
 if __name__ == "__main__":
@@ -97,4 +97,4 @@ if __name__ == "__main__":
         print("\n\n\n")
         print(processed_and_partitioned_input_data)
     else: 
-        print("Exited the database!")
+        print("\nExited the database!")
