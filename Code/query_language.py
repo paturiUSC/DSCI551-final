@@ -394,9 +394,6 @@ def menu_option_action(menu_option):
         print("You've chosen to insert data.")
         insertData()
 
-        # insert specific data/rows
-        # insert tables (stored as a separate file where table name is the name of the file)
-
     elif menu_option == "c":
         print("You've chosen to update data.")
         updateData()
