@@ -44,7 +44,41 @@ def useDatabase():
     return user_input == "yes"
 
 def selectData(): 
-    # filtering, joins, grouping, aggregation, and ordering
+    # Display the example prompts for the user
+    # join, aggregate, filter, order, group
+    print("\nHere are 3 example prompts to select data in the database. Use a semicolon ';' to end the command.")
+    print("Option 1 (filtering, grouping, ordering): FIND (stock open) IF (stock open greater than 120) IN (chunk0) BASED ON (NAME) WITH (open ascending);")
+    print("Option 2 (join): FIND (stock open) IF (stock open price greater than 120) IN (chunk0) AND (chunk1) ON (NAME) WITH (open ascending);")
+    print("Option 3 (aggregate): FIND (stock open sum) IN (chunk0) AND (chunk1) ON (NAME) WITH (open descending);")
+
+    print("\nTo group based on an attribute, use the 'BASED ON' keyword.")
+    print("\nTo join, use the 'AND' and  'ON' keyword.")
+    print("\nTo order by, use the 'WITH' keyword.")
+    print("\nTo filter, use the 'IF' keyword.")
+    print("\nThere are 4 different aggregation options: sum, average, maximum, mininum. These must be typed out in full after the name of the attribute you are looking for. For example, 'FIND (stock high maximum)'.")
+    print("Make sure to include spaces after each keyword like 'FIND'.")
+    print("\nExit out at anytime by typing 'exit;'\n")
+
+    # Get and validate user input
+    user_select_input = input(">")
+
+    while (not user_select_input) or (user_select_input[-1:] != ";"): 
+        user_select_input = input(">")
+    
+    if ("exit" in user_select_input):
+        print("\nExiting...")
+        return ""
+    
+    if ("find" not in user_select_input.lower() and "in" not in user_select_input.lower()): 
+        print("\nPlease enter a valid select statement, as provided in the examples above.")
+        print("Must include an 'IF' and an 'UPDATE' in the statement at least.")
+        return ""
+    
+    user_select_input = user_select_input.lower()
+
+    if not os.path.exists("./Output-Data"):
+        os.makedirs("./Output-Data")
+    
     return ""
 
 def updateData(): 
@@ -74,7 +108,6 @@ def updateData():
     if not os.path.exists("./Output-Data"):
         os.makedirs("./Output-Data")
     
-    # pattern = r"IF \((.*?)\) UPDATE (\w+) (?:\((.*?)\)|\(([^)]+)\));"
     pattern = r"IF \((.*?)\) UPDATE (\w+) \((.*?)\);"
     match = re.search(pattern, user_update_input, re.IGNORECASE)
     if match:
@@ -101,7 +134,6 @@ def updateData():
         if os.path.exists(table_path):
             # Read the .csv file and show the table information to the user 
             file_df = pd.read_csv(table_path)
-            # data_types_dict = {col: dtype for col, dtype in file_df.dtypes.items()}
             print("Here is the info of the table.")
             file_df.info()
 
@@ -563,14 +595,6 @@ def menu_option_action(menu_option):
     elif menu_option == "c":
         print("You've chosen to update data.")
         updateData()
-
-        # update all 
-        # update specific data
-        '''
-        UPDATE table_name
-        SET column1 = value1, column2 = value2, ...
-        WHERE condition;
-        '''
 
     elif menu_option == "d":
         print("You've chosen to delete data.")
