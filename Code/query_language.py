@@ -57,10 +57,16 @@ def updateData():
     # Get and validate user input
     user_update_input = input(">")
 
-    while (not user_update_input) or (user_update_input[-1:] != ";") or ("update" not in user_update_input.lower()): 
+    while (not user_update_input) or (user_update_input[-1:] != ";"): 
         user_update_input = input(">")
     
     if ("exit" in user_update_input):
+        print("\nExiting...")
+        return ""
+    
+    if ("update" not in user_update_input.lower() and "if" not in user_update_input.lower()): 
+        print("\nPlease enter a valid update statement, as provided in the examples above.")
+        print("Must include an 'IF' and an 'UPDATE' in the statement at least.")
         return ""
     
     user_update_input = user_update_input.lower()
