@@ -91,6 +91,7 @@ def selectData():
         print("no columns")
     
     # filter 
+    print()
     filter_regex = r'IF\s+\((.*?)\)\s+IN'
     filter_match = re.search(filter_regex, user_select_input, re.IGNORECASE)
 
@@ -103,6 +104,7 @@ def selectData():
         print("no filter conditions")
     
     # join - table names 
+    print()
     table_matches = re.findall(r'in\s+\(([^)]*)\)', user_select_input, re.IGNORECASE)
     if table_matches:
         # table_names = table_matches.group(1)
@@ -113,7 +115,8 @@ def selectData():
         print("no table names")
     
     # join - join conditions 
-    combined_via_matches = re.findall(r'(?:combined\s+via|coMbined\s+ViA)\s+\(([^)]*)\)', user_select_input, re.IGNORECASE)
+    print()
+    combined_via_matches = re.findall(r'(?:combined\s+via)\s+\(([^)]*)\)', user_select_input, re.IGNORECASE)
     if combined_via_matches:
         # join_conditions = combined_via_matches.group(1)
         print("join conditions")
@@ -124,6 +127,7 @@ def selectData():
 
 
     # group by
+    print()
     group_by_regex = r'group based by\s+\(([^)]*)\)'
     group_by_matches = re.findall(group_by_regex, user_select_input, re.IGNORECASE)
     if group_by_matches:
@@ -134,6 +138,7 @@ def selectData():
         print("no grouped by attributes")
     
     # order by 
+    print()
     order_by_regex = r'IN\s+THE\s+ORDER\s+OF\s+\(([^)]*)\);'
     order_by_matches = re.findall(order_by_regex, user_select_input, re.IGNORECASE)
     if order_by_matches:
