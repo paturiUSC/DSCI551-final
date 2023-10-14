@@ -156,6 +156,16 @@ def selectData():
         print("no order by attributes")
 
 
+    ###  pass the same df to each of these functions
+
+    # read df - identfiy valid file_path for all tables involved, etc. 
+    # join 
+    # filter 
+    # group by 
+    # aggregate 
+    # order by
+    # select/project
+
     
 
 
