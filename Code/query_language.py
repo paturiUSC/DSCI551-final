@@ -47,9 +47,9 @@ def selectData():
     # Display the example prompts for the user
     # join, aggregate, filter, order, group
     print("\nHere are 3 example prompts to select data in the database. Use a semicolon ';' to end the command.")
-    print("Option 1 (filtering, grouping, ordering): FIND (stock open) IF (stock open greater than 120) IN (chunk0) BASED ON (NAME) WITH (open ascending);")
-    print("Option 2 (join): FIND (stock open) IF (stock open price greater than 120) IN (chunk0) AND (chunk1) ON (NAME) WITH (open ascending);")
-    print("Option 3 (aggregate): FIND (stock open sum) IN (chunk0) AND (chunk1) ON (NAME) WITH (open descending);")
+    print("Option 1 (filtering, grouping, ordering): find (stock open) IF (stock open greater than 120) in (chunk0) and make sure to group based by (NAME) and show output IN the ORDER OF (open ascending, close descending);")
+    print("Option 2 (join): FIND (stock open and stock name) if (stock open price greater than 120 and stock close price less than 140) IN (chunk0) AND in (chunk1) combined via (NAME) and make sure to group based by (name, price) and show output IN THE ORDER OF (open ascending);")
+    print("Option 3 (aggregate): FIND (stock open sum) IN (chunk0) and in (chunk1) combined VIA (name) and in (chunk2) coMbined ViA (open) and show output in the order of (open descending);")
 
     print("\nTo group based on an attribute, use the 'BASED ON' keyword.")
     print("\nTo join, use the 'AND' and  'ON' keyword.")
@@ -78,6 +78,82 @@ def selectData():
 
     if not os.path.exists("./Output-Data"):
         os.makedirs("./Output-Data")
+
+    # select 
+    select_regex = r'find\s+\((.*?)\)\s'
+    select_match = re.search(select_regex, user_select_input, re.IGNORECASE)
+    if select_match:
+        columns = select_match.group(1)
+        print("columns")
+        print(columns)
+    else:
+        columns = ""
+        print("no columns")
+    
+    # filter 
+    filter_regex = r'IF\s+\((.*?)\)\s+IN'
+    filter_match = re.search(filter_regex, user_select_input, re.IGNORECASE)
+
+    if filter_match:
+        filter_conditions = filter_match.group(1)
+        print("filter conditions")
+        print(filter_conditions)
+    else:
+        filter_conditions = ""
+        print("no filter conditions")
+    
+    # join - table names 
+    table_matches = re.findall(r'in\s+\(([^)]*)\)', user_select_input, re.IGNORECASE)
+    if table_matches:
+        # table_names = table_matches.group(1)
+        print("table names")
+        print(table_matches)
+    else:
+        # table_names = ""
+        print("no table names")
+    
+    # join - join conditions 
+    combined_via_matches = re.findall(r'(?:combined\s+via|coMbined\s+ViA)\s+\(([^)]*)\)', user_select_input, re.IGNORECASE)
+    if combined_via_matches:
+        # join_conditions = combined_via_matches.group(1)
+        print("join conditions")
+        print(combined_via_matches)
+    else:
+        # table_names = ""
+        print("no join conditions")
+
+
+    # group by
+    group_by_regex = r'group based by\s+\(([^)]*)\)'
+    group_by_matches = re.findall(group_by_regex, user_select_input, re.IGNORECASE)
+    if group_by_matches:
+        attributes = [attr.strip() for attr in group_by_matches[0].split(',')]
+        print("grouped by attributes")
+        print(attributes)
+    else:
+        print("no grouped by attributes")
+    
+    # order by 
+    order_by_regex = r'IN\s+THE\s+ORDER\s+OF\s+\(([^)]*)\);'
+    order_by_matches = re.findall(order_by_regex, user_select_input, re.IGNORECASE)
+    if order_by_matches:
+        order_by_attributes = []
+        for attr in order_by_matches[0].split(','):
+            attr = attr.strip()
+            if 'ascending' in attr.lower():
+                order_by_attributes.append((attr.split()[0], 'ascending'))
+            elif 'descending' in attr.lower():
+                order_by_attributes.append((attr.split()[0], 'descending'))
+        
+        print("order by attributes")
+        print(order_by_attributes)
+    else:
+        print("no order by attributes")
+
+
+    
+
+
     
     return ""
 
