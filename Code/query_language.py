@@ -6,7 +6,7 @@ import re
 
 # to - do 
     # select 
-    # update 
+        # Add * for projection
     # insert/delete
         # remove/insert into whole dataset or partitioned tables 
     # insert 
@@ -84,11 +84,11 @@ def selectData():
     select_match = re.search(select_regex, user_select_input, re.IGNORECASE)
     if select_match:
         columns = select_match.group(1)
-        print("columns")
+        print("Projection columns identified.")
         print(columns)
     else:
         columns = ""
-        print("no columns")
+        print("No projection columns.")
     
     # filter 
     print()
@@ -97,33 +97,29 @@ def selectData():
 
     if filter_match:
         filter_conditions = filter_match.group(1)
-        print("filter conditions")
+        print("Filter conditions identified.")
         print(filter_conditions)
     else:
         filter_conditions = ""
-        print("no filter conditions")
+        print("No filter condition(s).")
     
     # join - table names 
     print()
     table_matches = re.findall(r'in\s+\(([^)]*)\)', user_select_input, re.IGNORECASE)
     if table_matches:
-        # table_names = table_matches.group(1)
-        print("table names")
+        print("Table name(s) identified.")
         print(table_matches)
     else:
-        # table_names = ""
-        print("no table names")
+        print("No table name(s).")
     
     # join - join conditions 
     print()
     combined_via_matches = re.findall(r'(?:combined\s+via)\s+\(([^)]*)\)', user_select_input, re.IGNORECASE)
     if combined_via_matches:
-        # join_conditions = combined_via_matches.group(1)
-        print("join conditions")
+        print("Join condition(s) identified.")
         print(combined_via_matches)
     else:
-        # table_names = ""
-        print("no join conditions")
+        print("No join conditions")
 
 
     # group by
@@ -132,10 +128,10 @@ def selectData():
     group_by_matches = re.findall(group_by_regex, user_select_input, re.IGNORECASE)
     if group_by_matches:
         attributes = [attr.strip() for attr in group_by_matches[0].split(',')]
-        print("grouped by attributes")
+        print("Grouped by attributes identified.")
         print(attributes)
     else:
-        print("no grouped by attributes")
+        print("No grouped by attributes.")
     
     # order by 
     print()
@@ -150,13 +146,29 @@ def selectData():
             elif 'descending' in attr.lower():
                 order_by_attributes.append((attr.split()[0], 'descending'))
         
-        print("order by attributes")
+        print("Order by attributes identified.")
         print(order_by_attributes)
     else:
-        print("no order by attributes")
+        print("No order by attributes.")
 
 
-    ###  pass the same df to each of these functions
+    # Check if the table names in the select statement are valid
+    valid_tables = True
+    for table_name in table_matches: 
+        tables_path = "./Output-Data/"
+        table_path = tables_path + str(table_name) + ".csv"
+        if not os.path.exists(table_path):
+            print("Table", str(table_name), "is not a table in the database.")
+            print("Please input a valid table name.")
+            valid_tables = False
+    
+    if not valid_tables: 
+        print("Exited the select operation as valid table name(s) were not inputted.")
+        return ""
+    
+    # If the inputted table names are valid, execute the join condition first to combine any tables
+    
+
 
     # read df - identfiy valid file_path for all tables involved, etc. 
     # join 
