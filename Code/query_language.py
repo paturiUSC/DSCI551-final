@@ -2,18 +2,17 @@ import os
 import pandas as pd
 import numpy as np
 import re
+import psutil
 
+
+outer_table_name = "all_stocks_5yr"
+chunk_num = 972
 
 # to - do 
     # select 
         # Add * for projection
         # Join where the column name on the left and column name on the right could be different and join on multiple attributes
-    # insert/delete
-        # remove/insert into whole dataset or partitioned tables 
-    # insert 
-        # only insert into partition if it's number of rows is less than the memory size
-            # if it is more than the memory size, create a new partition based on the partition 
-        # int to float dtype conversion automatically when inserting null values in pandas
+        # redo join, groupby (any pandas with .join or .agg)
     
 
 def displayUserMenu(): 
@@ -345,7 +344,7 @@ def selectData():
         # Filter the table
         if filter_expression is not None:
             print("\nThese are the identified rows:")
-            print(select_df[filter_expression])
+            # print(select_df[filter_expression])
             print("There are", str(len(select_df[filter_expression])), "rows that have been identified in the table.")
 
             print("\nFiltering...")
@@ -679,8 +678,8 @@ def updateData():
     if ("exit" in user_update_input):
         print("\nExiting...")
         return ""
-    
-    if ("update" not in user_update_input.lower() and "if" not in user_update_input.lower()): 
+
+    if ("update" not in user_update_input.lower() or "if" not in user_update_input.lower()): 
         print("\nPlease enter a valid update statement, as provided in the examples above.")
         print("Must include an 'IF' and an 'UPDATE' in the statement at least.")
         return ""
@@ -689,133 +688,316 @@ def updateData():
 
     if not os.path.exists("./Output-Data"):
         os.makedirs("./Output-Data")
+
+    user_update_input_split = user_update_input.split()
+    in_index = user_update_input_split.index("update")
+    table_name = user_update_input_split[in_index + 1]
+
+    first_open_parenthesis_index = user_update_input.find("(")
+    first_close_parenthesis_index = user_update_input.find(")")
+
+    second_open_parenthesis_index = user_update_input.find("(", first_open_parenthesis_index + 1)
+    second_close_parenthesis_index = user_update_input.find(")", first_close_parenthesis_index + 1)
+
+    update_conditions_str = user_update_input[first_open_parenthesis_index + 1 : first_close_parenthesis_index]
+    update_columns_str = user_update_input[second_open_parenthesis_index + 1 : second_close_parenthesis_index]
+
+    # Split the column names and values strings into individual lists
+    # if (a < 5) update test_table VALUES (a = 50);
+    columns_to_update = [col.strip() for col in update_columns_str.split(',')]
+    column_names_to_update = [col.split("=")[0].strip() for col in columns_to_update]
+    column_values_to_update = [col.split("=")[1].strip() for col in columns_to_update]
+
+
+    update_conditions = [col.strip() for col in update_conditions_str.split(',')]
+    update_condition = False
+    if len(update_conditions[0]) > 0:
+        update_condition = True
+        # Identify the filter conditions inputted by the user
+        pattern = re.compile(r'\s*(<|>|=|>=|<=|LIKE)\s*')
+        update_conditions_column_names = [re.split(pattern, item)[0] for item in update_conditions]
+        update_conditions_operator = [re.split(pattern, item)[1] for item in update_conditions]
+        update_conditions_column_values = [re.split(pattern, item)[2] for item in update_conditions]
     
-    pattern = r"IF \((.*?)\) UPDATE (\w+) \((.*?)\);"
-    match = re.search(pattern, user_update_input, re.IGNORECASE)
-    if match:
-        conditions_str, table_name, updates_str = match.groups()
-
-        # Extract column names, comparison operators, new values, and conditions
-        conditions = re.findall(r"(\w+)\s*([<>]=?|==|!=)\s*([0-9.]+)", conditions_str)
-        updates = re.findall(r"(\w+)\s*=\s*([0-9.]+)", updates_str)
-
-        # Print the results
-        print("\n\nTable Name:", table_name)
+    # Print the results
+    print("\n\nTable Name:", table_name)
+    if update_condition:
         print("Conditions:")
-        for column, operator, value in conditions:
-            print(f"Column: {column}, Operator: {operator}, Condition: {value}")
-        print("Updates:")
-        for column, value in updates:
-            print(f"Column: {column}, New Value: {value}")
-        print("\n")
+        for index in range(len(update_conditions_column_names)):
+            print(f"\tColumn: {update_conditions_column_names[index]}, Operator: {update_conditions_operator[index]}, Condition: {update_conditions_column_values[index]}")
+    print("Updates:")
+    for index in range(len(column_names_to_update)):
+        print(f"\tColumn: {column_names_to_update[index]}, New Value: {column_values_to_update[index]}")
+    print("\n")
 
-        # Check if the table exists
-        tables_path = "./Output-Data/"
-        table_path = tables_path + str(table_name) + ".csv"
+    # Check if the table exists
+    tables_path = "./Output-Data/"
+    table_path = tables_path + str(table_name)
+    
+    if os.path.exists(table_path):
+        # Read the .csv file and show the table information to the user 
+        table_chunks = os.listdir(table_path)
+        file_df = pd.read_csv(table_path + "/chunk0.csv")
+        for chunk in table_chunks: 
+            if chunk != "chunk0.csv":
+                chunk_df = pd.read_csv(table_path + "/" + chunk)
+                file_df = pd.concat([file_df, chunk_df], ignore_index=True)
+        print("Here is the info of the table.")
+        file_df.info()
+    
+        # Filter condition 
+        df_filter_expression = None
+        str_filter_expression = None
 
-        if os.path.exists(table_path):
-            # Read the .csv file and show the table information to the user 
-            file_df = pd.read_csv(table_path)
-            print("Here is the info of the table.")
-            file_df.info()
+        # Check if all the user-inputted columns in the update statement are in the table
+        table_columns = list(file_df.columns)
+        for list_index in range(len(column_names_to_update)):
+            update_data = True
+            column_name = column_names_to_update[list_index]
+            column_name = column_name.strip().lower()
+            if column_name in table_columns:
+                # Check if data types match of the column values 
+                value = column_values_to_update[list_index]
 
-            # Filter condition 
-            df_filter_expression = None
-            str_filter_expression = None
+                # Check if int or float or object
+                # Attempt to convert to an integer
+                try:
+                    if (value.isdecimal()):
+                        value = int(value)
+                    else: 
+                        value = float(value)
+                    print(f"Converted to number: {value}")
+                except:
+                    # If it's not a valid integer, try converting to a float
+                    print(f"Not converted to number. Kept value as string: {value}")
 
-            # Check if all the user-inputted columns in the update statement are in the table
-            for column, operator, value in conditions: 
-                condition = None
-                if column in list(file_df.columns):
-                    if operator == '=':
-                        value = float(value)
-                        condition = (file_df[column] == value)
-                        if str_filter_expression is None:
-                            str_filter_expression = "(file_df[" + str(column) + "] == " + str(value) + ")"
-                        else: 
-                            str_filter_expression += "& (file_df[" + str(column) + "] == " + str(value) + ")"
-                    elif operator == '<':
-                        value = float(value)
-                        condition = (file_df[column] < value)
-                        if str_filter_expression is None:
-                            str_filter_expression = "(file_df[" + str(column) + "] < " + str(value) + ")"
-                        else: 
-                            str_filter_expression += "& (file_df[" + str(column) + "] < " + str(value) + ")"
-                    elif operator == '>':
-                        value = float(value)
-                        condition = (file_df[column] > value)
-                        if str_filter_expression is None:
-                            str_filter_expression = "(file_df[" + str(column) + "] > " + str(value) + ")"
-                        else: 
-                            str_filter_expression += "& (file_df[" + str(column) + "] > " + str(value) + ")"
-                    elif operator == '<=':
-                        value = float(value)
-                        condition = (file_df[column] <= value)
-                        if str_filter_expression is None:
-                            str_filter_expression = "(file_df[" + str(column) + "] <= " + str(value) + ")"
-                        else: 
-                            str_filter_expression += "& (file_df[" + str(column) + "] <= " + str(value) + ")"
-                    elif operator == '>=':
-                        value = float(value)
-                        condition = (file_df[column] >= value)
-                        if str_filter_expression is None:
-                            str_filter_expression = "(file_df[" + str(column) + "] >= " + str(value) + ")"
-                        else: 
-                            str_filter_expression += "& (file_df[" + str(column) + "] >= " + str(value) + ")"
-                    elif operator == 'like':
-                        condition = file_df[column].str.contains(value, case=False)
-                        if str_filter_expression is None:
-                            str_filter_expression = "(file_df[" + str(column) + "] LIKE " + str(value) + ")"
-                        else: 
-                            str_filter_expression += "& (file_df[" + str(column) + "] LIKE " + str(value) + ")"
-                    
-                    # Combine the filter expression conditions using logical 'and'
-                    if df_filter_expression is None:
-                        df_filter_expression = condition
-                    else:
-                        df_filter_expression = df_filter_expression & condition
-                
+                print("The column dtype: ", file_df[column_name].dtype)
+                print("The value dtype: ", type(value))
+                if (file_df[column_name].dtype == type(value)): 
+                    update_data = True
                 else: 
-                    print("The column,", column, ", identified in the update statement does not exist in table", str(table_name) + ".")
-                    print("Please enter an update statement with valid column names.")
-                    print("Here are a list of the columns in table", str(table_name) + ":")
-                    print(list(file_df.columns))
+                    if file_df[column_name].dtype == "float64":
+                        # int can be converted to float
+                        if isinstance(value, int):
+                            update_data = True
+                        else: 
+                            print("\nNot ok")
+                            print("Don't add.")
+                            update_data = False
+                            print("Datatype mismatch for the column", column_name)
+                    else: 
+                        if (str(file_df[column_name].dtype) == "object"): 
+                            update_data = True
+                        else:  
+                            # If the column type is int, convert float values to int
+                            if (file_df[column_name] == "int64"):
+                                if (type(value) == float):
+                                    value = int(value)
+                                    update_data = True
+                                elif (type(value) == int):
+                                    update_data=True    
+                                else: 
+                                    update_data = False
+                                    print("\nDatatype mismatch for the column", column_name)
+                            else: 
+                                update_data = False
+                                print("\nDatatype mismatch for the column", column_name)
+
+            if not update_data:
+                print("\nDatatype mismatch. Cannot update the values without changing the datatype of the entire column.")
+                print("Here is the the table's datatype information.")
+                print(file_df.info())
+                return ""
+            
+        # Repeat the check for the update conditions and build the filter expression
+        if update_condition:
+            for list_index in range(len(update_conditions_column_names)):
+                update_data = True
+                column_name = update_conditions_column_names[list_index]
+                column_name = column_name.strip().lower()
+                if column_name in table_columns:
+                    # Check if data types match of the column values 
+                    value = update_conditions_column_values[list_index]
+
+                    # Check if int or float or object
+                    # Attempt to convert to an integer
+                    try:
+                        if (value.isdecimal()):
+                            value = int(value)
+                        else: 
+                            value = float(value)
+                        print(f"Converted to number: {value}")
+                    except:
+                        # If it's not a valid integer, try converting to a float
+                        print(f"Not converted to number. Kept value as string: {value}")
+
+                    print("The column dtype: ", file_df[column_name].dtype)
+                    print("The value dtype: ", type(value))
+                    if (file_df[column_name].dtype == type(value)): 
+                        update_data = True
+                    else: 
+                        if file_df[column_name].dtype == "float64":
+                            # int can be converted to float
+                            if isinstance(value, int):
+                                update_data = True
+                            else: 
+                                print("\nNot ok")
+                                print("Don't add.")
+                                update_data = False
+                                print("Datatype mismatch for the column", column_name)
+                        else: 
+                            if (str(file_df[column_name].dtype) == "object"): 
+                                update_data = True
+                            else:  
+                                # If the column type is int, convert float values to int
+                                if (file_df[column_name] == "int64"):
+                                    if (type(value) == float):
+                                        value = int(value)
+                                        update_data = True
+                                    elif (type(value) == int):
+                                        update_data=True    
+                                    else: 
+                                        update_data = False
+                                        print("\nDatatype mismatch for the column", column_name)
+                                else: 
+                                    update_data = False
+                                    print("\nDatatype mismatch for the column", column_name)
+
+                if not update_data:
+                    print("\nDatatype mismatch. Cannot update the values without changing the datatype of the entire column.")
+                    print("Here is the the table's datatype information.")
+                    print(file_df.info())
                     return ""
+
+                operator = update_conditions_operator[index]
+                if operator == '=':
+                    try: 
+                        value = float(value)
+                        condition = (file_df[column_name] == value)
+                        if str_filter_expression is None:
+                            str_filter_expression = "(file_df[" + str(column_name) + "] == " + str(value) + ")"
+                        else: 
+                            str_filter_expression += "& (file_df[" + str(column_name) + "] == " + str(value) + ")"
+                    except: 
+                        print("When using the =  operator, must have a number.")
+                elif operator == '<':
+                    try:
+                        value = float(value)
+                        condition = (file_df[column_name] < value)
+                        if str_filter_expression is None:
+                            str_filter_expression = "(file_df[" + str(column_name) + "] < " + str(value) + ")"
+                        else: 
+                            str_filter_expression += "& (file_df[" + str(column_name) + "] < " + str(value) + ")"
+                    except: 
+                        print("When using the <  operator, must have a number.")
+                elif operator == '>':
+                    try:
+                        value = float(value)
+                        condition = (file_df[column_name] > value)
+                        if str_filter_expression is None:
+                            str_filter_expression = "(file_df[" + str(column_name) + "] > " + str(value) + ")"
+                        else: 
+                            str_filter_expression += "& (file_df[" + str(column_name) + "] > " + str(value) + ")"
+                    except: 
+                        print("When using the >  operator, must have a number.")
+                elif operator == '<=':
+                    try:
+                        value = float(value)
+                        condition = (file_df[column_name] <= value)
+                        if str_filter_expression is None:
+                            str_filter_expression = "(file_df[" + str(column_name) + "] <= " + str(value) + ")"
+                        else: 
+                            str_filter_expression += "& (file_df[" + str(column_name) + "] <= " + str(value) + ")"
+                    except: 
+                        print("When using the <=  operator, must have a number.")
+                elif operator == '>=':
+                    try:
+                        value = float(value)
+                        condition = (file_df[column_name] >= value)
+                        if str_filter_expression is None:
+                            str_filter_expression = "(file_df[" + str(column_name) + "] >= " + str(value) + ")"
+                        else: 
+                            str_filter_expression += "& (file_df[" + str(column_name) + "] >= " + str(value) + ")"
+                    except: 
+                        print("When using the >=  operator, must have a number.")
+                elif operator == 'like':
+                    condition = file_df[column_name].str.contains(value, case=False)
+                    if str_filter_expression is None:
+                        str_filter_expression = "(file_df[" + str(column_name) + "] LIKE " + str(value) + ")"
+                    else: 
+                        str_filter_expression += "& (file_df[" + str(column_name) + "] LIKE " + str(value) + ")"
                 
+                # Combine the filter expression conditions using logical 'and'
+                if df_filter_expression is None:
+                    df_filter_expression = condition
+                else:
+                    df_filter_expression = df_filter_expression & condition
+        
+        # Update the table
+        if df_filter_expression is None:
+            print("\nUpdating table " + table_name + "...")
+
+            table_chunks = os.listdir(table_path)
+            for chunk in table_chunks: 
+                chunk_df = pd.read_csv(table_path + "/" + chunk)
+                chunk_dict = chunk_df.to_dict(orient="list")
+                print("Old values in chunk" + str(chunk) + ":")
+                print(chunk_dict)
+
+                for index in range(len(column_names_to_update)):
+                    column_name = column_names_to_update[index]
+                    new_column_value = column_values_to_update[index]
+
+                    updated_values = [new_column_value for old_value in chunk_dict[column_name]]
+                    print("\nNew updated values for the column", column_name, "in chunk", chunk)
+                    print(updated_values)
+                    chunk_dict[column_name] = updated_values
+
+                chunk_df = pd.DataFrame(chunk_dict)
+                chunk_df.to_csv(table_path + "/" + chunk, index=False)
+
+                print("\n\nUpdated the values in chunk", chunk)
+            
+            print("\n\nFinished updating table", str(table_name))
+
+        elif df_filter_expression is not None and update_condition:  # if (a < 9) update test_table VALUES (a = 50);
             # Now that the filter condition has been constructured, identify all the appropriate rows in the corresponding table/DataFrame
             # Show update output to user
-            if df_filter_expression is not None:
-                print("\nThis is the identified filter expression.")
-                print("file_df[" + str_filter_expression + "]")
+            print("\nThis is the identified filter expression.")
+            print("file_df[" + str_filter_expression + "]")
 
-                print("\nThese are the identified rows:")
-                print(file_df[df_filter_expression])
-                print("There are", str(len(file_df[df_filter_expression])), "rows that have been identified in table", str(table_name))
+            print("\nThese are the identified rows:")
+            total_rows = 0
+            for chunk in table_chunks: 
+                file_df = pd.read_csv(table_path + "/" + chunk)
+                total_rows += len(file_df[df_filter_expression])
 
+            print("\nThere are", str(total_rows), "rows that have been identified in table", str(table_name), "to be updated.")
+            if total_rows > 0:
                 print("\nUpdating...")
-                for column, value in updates:
-                    file_df.loc[df_filter_expression, column] = value
-                    print("Updated", str(column), "to a value of", str(value))
-                
-                file_df.to_csv(table_path, index=False)
-            else:
-                print("No valid filter expression could be constructured from the inputted update command.")
-    
-            print("\nUpdate operation complete!")
-    
+                for index in range(len(column_names_to_update)):
+                    column_name = column_names_to_update[index]
+                    new_column_value = column_values_to_update[index]
+                    for chunk in table_chunks: 
+                        file_df = pd.read_csv(table_path + "/" + chunk)
+                        file_df.loc[df_filter_expression.reset_index(drop=True), column_name] = new_column_value
+                        file_df.to_csv(table_path + "/" + chunk, index=False)
+                        print("Updated", str(column_name), "to a value of", str(new_column_value), "in chunk", str(chunk))
+            else: 
+                print("\nNo rows meet the update conditions. No rows being updated.")
+            print("\n\nFinished updating table", str(table_name), "based on the update conditions.")
 
-        # Error message showing all table names in the database if table path does not exist
         else: 
-            tables_path = "./Output-Data/"
-            file_list = os.listdir(tables_path)
-            print("This table does not exist in the database. Please include a valid table name.")
-            print("Here is a list of valid table names, please try again.")
-            print(file_list)
-            return ""
+            print("\nThere was an error in identifying and building the filter expression. Please try again.")
+            print("Please follow the syntax of using the keyword 'IF' followed by ' ()' with the condition on which rows to update inside the ().")
 
     else: 
-        print("\nThe table name and/or update parameters could not be identified.")
-        print("Please enter a valid update statement similar to the provided examples.")
+        tables_path = "./Output-Data/"
+        file_list = os.listdir(tables_path)
+        print("This table does not exist in the database. Please include a valid table name.")
+        print("Here is a list of valid table names, please try again.")
+        print(file_list)
+        return ""
 
 def insertData(): 
     # Display the example prompts for the user
@@ -841,7 +1023,7 @@ def insertData():
         os.makedirs("./Output-Data")
 
     # Create a new table
-    if "table " in user_insert_input: 
+    if " table " in user_insert_input: 
         pattern = r"Insert\s+table\s+(\w+)\s*\((.*?)\)"
 
         # Match the pattern to the user inpitted command
@@ -869,9 +1051,12 @@ def insertData():
             # Set data types for each user inputted column
             for column, dtype in column_info.items():
                 new_table_df[column] = new_table_df[column].astype(dtype)
+
+            if not os.path.exists("./Output-Data/" + table_name):
+                os.makedirs("./Output-Data/" + table_name)
             
             # Export the DataFrame as a .csv to store the data
-            new_table_file_name = './Output-Data/' + table_name + '.csv'
+            new_table_file_name = './Output-Data/' + table_name + '/chunk0.csv'
             new_table_df.to_csv(new_table_file_name, index=False)
 
             # Show output to user
@@ -885,18 +1070,33 @@ def insertData():
     # Insert a row of data 
     elif "row" in user_insert_input: 
 
-        user_insert_input = user_insert_input.lower();
-        pattern = r"insert\s+row\s+in\s+(\w+)\s+\((.*?)\)\s*values\s*\((.*?)\);"
+        user_insert_input = user_insert_input.lower()
+        # pattern = r"insert\s+row\s+in\s+(\w+)\s+\((.*?)\)\s*values\s*\((.*?)\);"
 
         # Match the pattern to the user inputted command
-        match = re.match(pattern, user_insert_input, re.IGNORECASE)
+        # match = re.match(pattern, user_insert_input, re.IGNORECASE)
+        match = True
 
         if match:
-            # Get the table name
-            table_name = match.group(1)  
-            # Get the column names and values
-            column_names_str = match.group(2)  
-            column_values_str = match.group(3)  
+            # # Get the table name
+            # table_name = match.group(1)  
+            # # Get the column names and values
+            # column_names_str = match.group(2)  
+            # column_values_str = match.group(3)  
+            user_insert_input_split = user_insert_input.lower().split()
+            in_index = user_insert_input_split.index("in")
+            table_name = user_insert_input_split[in_index + 1]
+
+            # Find the position of the first "(" and ")"
+            first_open_parenthesis_index = user_insert_input.find("(")
+            first_close_parenthesis_index = user_insert_input.find(")")
+
+            # Find the position of the second "(" and ")"
+            second_open_parenthesis_index = user_insert_input.find("(", first_open_parenthesis_index + 1)
+            second_close_parenthesis_index = user_insert_input.find(")", first_close_parenthesis_index + 1)
+
+            column_names_str = user_insert_input[first_open_parenthesis_index + 1 : first_close_parenthesis_index]
+            column_values_str = user_insert_input[second_open_parenthesis_index + 1 : second_close_parenthesis_index]
 
             # Split the column names and values strings into individual lists
             column_names = [col.strip() for col in column_names_str.split(',')]
@@ -917,11 +1117,20 @@ def insertData():
 
             # Check if the table exists 
             tables_path = "./Output-Data/"
-            table_path = tables_path + table_name + ".csv"
+            table_path = tables_path + table_name 
             file_list = os.listdir(tables_path)
 
-            if os.path.exists(table_path):
-                file_df = pd.read_csv(table_path)
+            # Put together the chunks of each table
+            if (os.path.exists(table_path)):
+                table_chunks = os.listdir(table_path)
+                file_df = pd.read_csv(table_path + "/chunk0.csv")
+
+                for chunk in table_chunks: 
+                    if chunk != "chunk0.csv":
+                        chunk_df = pd.read_csv(table_path + "/" + chunk)
+                        file_df = pd.concat([file_df, chunk_df], ignore_index=True)
+
+                # file_df = pd.read_csv(table_path)
                 data_types_dict = {col: dtype for col, dtype in file_df.dtypes.items()}
                 print("Here is the info of the table.")
                 print(file_df.info())
@@ -941,32 +1150,46 @@ def insertData():
                         # Check if int or float or object
                         # Attempt to convert to an integer
                         try:
-                            value = int(value)
-                            print(f"Converted to integer: {value}")
-                        except ValueError:
-                            # If it's not a valid integer, try converting to a float
-                            try:
+                            if (value.isdecimal()):
+                                value = int(value)
+                            else: 
                                 value = float(value)
-                                print(f"Converted to float: {value}")
-                            except ValueError:
-                                # If it can't be converted to either int or float, it's invalid
-                                print("Invalid input. Please enter a valid number.")
+                            print(f"Converted to number: {value}")
+                        except:
+                            # If it's not a valid integer, try converting to a float
+                            print(f"Not converted to number. Kept value as string: {value}")
 
                         print("The column dtype: ", file_df[column_name].dtype)
                         print("The value dtype: ", type(value))
                         if (file_df[column_name].dtype == type(value)): 
                             add_data = True
                         else: 
-                            if file_df[column_name].dtype == float:
+                            if file_df[column_name].dtype == "float64":
                                 # int can be converted to float
                                 if isinstance(value, int):
                                     add_data = True
                                 else: 
-                                    print("Not ok")
+                                    print("\nNot ok")
                                     print("Don't add.")
                                     add_data = False
+                                    print("Datatype mismatch for the column", column_name)
                             else: 
-                                add_data = False
+                                if (str(file_df[column_name].dtype) == "object"): 
+                                    add_data = True
+                                else:  
+                                    # If the column type is int, convert float values to int
+                                    if (file_df[column_name] == "int64"):
+                                        if (type(value) == float):
+                                            value = int(value)
+                                            add_data = True
+                                        elif (type(value) == int):
+                                            add_data=True    
+                                        else: 
+                                            add_data = False
+                                            print("\nDatatype mismatch for the column", column_name)
+                                    else: 
+                                        add_data = False
+                                        print("\nDatatype mismatch for the column", column_name)
 
                         # If column name exists and column value of the correct data type, then add that data
                         if add_data: 
@@ -1012,8 +1235,16 @@ def insertData():
                     print("\n\nHere is the data being inserted into the table", new_data)
 
                     try:
-                        # Attempt to write the modified DataFrame to the same CSV file/table
-                        appended_file_df.to_csv(table_path, index=False)
+                        # Attempt to write the modified DataFrame back to storage and resize the chunks 
+                        appended_file_df.to_csv("./temp.csv", index=False)
+                        available_ram_gb = psutil.virtual_memory()[1]/1000000000
+                        print('RAM Available (GB):', available_ram_gb)
+                        memory_size = int(available_ram_gb * 1000)
+                        for i, chunk in enumerate(pd.read_csv("./temp.csv", chunksize=memory_size)):
+                            new_file_name = './Output-Data/' + table_name + '/chunk{}.csv'.format(i)
+                            chunk.to_csv(new_file_name, index=False)
+                        os.remove("./temp.csv")
+
                         print("DataFrame successfully written to CSV.")
                         print("Confirm with the table info.")
                         print(appended_file_df.info())
@@ -1062,7 +1293,11 @@ def deleteData():
     if not os.path.exists("./Output-Data"):
             os.makedirs("./Output-Data")
 
-    directory_data_files = os.listdir("./Output-Data")
+    directory_data_directories = os.listdir("./Output-Data")
+    directory_data_files = []
+    for directory in directory_data_directories:
+        for file in os.listdir("./Output-Data/" + directory):
+            directory_data_files.append("./Output-Data/" + directory + "/" + file)
 
     if len(directory_data_files) == 0:
         print("No data in the database right now.")
@@ -1079,16 +1314,24 @@ def deleteData():
     # Delete all data from a specific table
     elif "all" in user_delete_input:
         table_name = input(">")
-        while not os.path.exists("./Output-Data/" + table_name + ".csv"): 
+        while not os.path.exists("./Output-Data/" + table_name): 
             table_name = input("The entered table does not exist. Please enter a valid table name: ")
-        file_path = "./Output-Data/" + table_name + ".csv"
-
-        os.remove(file_path)
+        file_path = "./Output-Data/" + table_name
+        table_files = os.listdir(file_path)
+        for file in table_files:
+            os.remove(file_path + "/" + file)
 
         print("Deleted all data from table", table_name)
 
     # Delete specific rows of data
     elif "=" in user_delete_input or ">" in user_delete_input or ">=" in user_delete_input or "<" in user_delete_input or "<=" in user_delete_input or "like" in user_delete_input:
+
+        # Identify which table to delete from 
+        table_name = input("Enter the table name to delete these rows from: ")
+        # Check if this table exists 
+        while (not os.path.exists("./Output-Data/" + table_name)):
+            table_name = input("Enter a valid table name to delete these rows from: ")
+        print("Great. The table", table_name, "does exist.")
 
         # Identify the relevant columns and corresponding comparison phrases 
         # Define the regular expression pattern to match the specified phrases
@@ -1098,11 +1341,13 @@ def deleteData():
         matches = re.findall(pattern, user_delete_input, re.IGNORECASE)
 
         # Apply delete input on each file/table in the database
+        directory_data_files = os.listdir("./Output-Data/" + table_name)
+        print(directory_data_files)
         for file in directory_data_files: 
             # Extract and print the matched phrases, along with words/values before and after
             df_filter_expression = None
 
-            file_path = "./Output-Data/" + file
+            file_path = "./Output-Data/" + table_name + "/" + file
 
             file_df = pd.read_csv(file_path)
             original_length = len(file_df)
@@ -1119,20 +1364,50 @@ def deleteData():
                 if column in column_headers:
                     # Construct a filter expression
                     if comparison_phrase == '=':
-                        value = float(value)
-                        condition = (file_df[column] == value)
+                        try:
+                            if (value.isdecimal()):
+                                value = int(value)
+                            else: 
+                                value = float(value)
+                            condition = (file_df[column] == value)
+                        except: 
+                            print("When using the =  operator, must have a number.")
                     elif comparison_phrase == '<':
-                        value = float(value)
-                        condition = (file_df[column] < value)
+                        try:
+                            if (value.isdecimal()):
+                                value = int(value)
+                            else: 
+                                value = float(value)
+                            condition = (file_df[column] < value)
+                        except: 
+                            print("When using the <  operator, must have a number.")
                     elif comparison_phrase == '>':
-                        value = float(value)
-                        condition = (file_df[column] > value)
+                        try:
+                            if (value.isdecimal()):
+                                value = int(value)
+                            else: 
+                                value = float(value)
+                            condition = (file_df[column] > value)
+                        except: 
+                            print("When using the >  operator, must have a number.")
                     elif comparison_phrase == '<=':
-                        value = float(value)
-                        condition = (file_df[column] <= value)
+                        try:
+                            if (value.isdecimal()):
+                                value = int(value)
+                            else: 
+                                value = float(value)
+                            condition = (file_df[column] <= value)
+                        except: 
+                            print("When using the <=  operator, must have a number.")
                     elif comparison_phrase == '>=':
-                        value = float(value)
-                        condition = (file_df[column] >= value)
+                        try:
+                            if (value.isdecimal()):
+                                value = int(value)
+                            else: 
+                                value = float(value)
+                            condition = (file_df[column] >= value)
+                        except: 
+                            print("When using the >=  operator, must have a number.")
                     elif comparison_phrase == 'like':
                         condition = file_df[column].str.contains(value, case=False)
                     
@@ -1150,11 +1425,11 @@ def deleteData():
                 print("This is the identified filter expression.")
                 print(df_filter_expression)
 
-                print("Dropping...")
+                print("Dropping in " + file + " for table " + table_name + "...")
                 filtered_file_df = file_df[~df_filter_expression]
                 dropped_rows = original_length - len(filtered_file_df)
                 
-                print("These are how many rows got dropped/deleted:", str(dropped_rows))
+                print("These are how many rows got dropped/deleted in " + file + ":" , str(dropped_rows))
                 filtered_file_df.to_csv(file_path, index=False)
             else:
                 print("No valid delete command found in your input.")

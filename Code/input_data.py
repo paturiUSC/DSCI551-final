@@ -9,7 +9,7 @@ import psutil
 def get_user_input_file():
     print("Welcome to the database! For this database, please enter the file location of the data you would like to upload to the database.")
     print("Please ensure the data is structured. This database acts like a relational database handling structured data.")
-    print("Please only input a .csv file. Please enter 'exit' to exit the system.\n")
+    print("Please only input a .csv or .txt file. Please enter 'exit' to exit the system.\n")
     file_location = input(">")
     if file_location != "exit":
         while not os.path.exists(file_location) and (file_location != "exit"): 
@@ -80,8 +80,12 @@ def partitionInput(file_location):
     print("The determined chunk size is", memory_size, "and so there will be", memory_size ,"rows of data per partitioned dataset.\n\n")
 
     # partition into different CSV files 
+    table_name = file_location.split("/")[-1].split(".")[0]
+    if not os.path.exists("./Output-Data/" + table_name):
+            os.makedirs("./Output-Data/" + table_name)
+
     for i, chunk in enumerate(pd.read_csv(file_location, chunksize=memory_size)):
-        new_file_name = './Output-Data/chunk{}.csv'.format(i)
+        new_file_name = './Output-Data/' + table_name + '/chunk{}.csv'.format(i)
         chunk.to_csv(new_file_name, index=False)
         partitionedDataFileNames.append(new_file_name)
         print("Created", new_file_name)
