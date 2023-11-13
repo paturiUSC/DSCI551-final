@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import re
 import psutil
+import csv 
 
 
 outer_table_name = "all_stocks_5yr"
@@ -160,8 +161,8 @@ def selectData():
     valid_tables = True
     for table_name in table_matches: 
         tables_path = "./Output-Data/"
-        table_name = str(table_name).lower()
-        table_path = tables_path + table_name + ".csv"
+        table_name = str(table_name)
+        table_path = tables_path + table_name 
         if not os.path.exists(table_path):
             print("Table", str(table_name), "is not a table in the database.")
             print("Please input a valid table name.")
@@ -169,6 +170,8 @@ def selectData():
     
     if not valid_tables: 
         print("\nExited the select operation as valid table name(s) were not inputted.")
+        print("These are the tables currently in the database.")
+        print(os.listdir("./Output-Data"))
         return ""
     
     # If the inputted table names are valid, execute the join condition first to combine any tables
@@ -188,479 +191,553 @@ def selectData():
 
         # Check if the join can be performed
         join_valid = True
+        tables_path = "./Output-Data/"
         for join_condition_attribute in combined_via_matches: 
-            print()
-            for table_name in table_matches: 
-                tables_path = "./Output-Data/"
-                table_name = str(table_name).lower()
-                table_path = tables_path + table_name + ".csv"
+            print(join_condition_attribute)
+            for table_index in range(len(table_matches) - 1): 
+                # Check if the first table has the join attribute 
+                table_name = table_matches[table_index]
+                # Assuming every table has at least one chunk allocated to it (even when empty)
+                table_path = tables_path + table_name + "/chunk0.csv"
                 file_df = pd.read_csv(table_path)
-                join_condition_attribute = str(join_condition_attribute).lower()
-                file_df_columns = [column.lower() for column in list(file_df.columns)]
+                # Case sentitive join attribute names
+                join_condition_attribute = str(join_condition_attribute)
+                file_df_columns = list(file_df.columns)
                 if join_condition_attribute not in file_df_columns: 
                     print(str(join_condition_attribute), "is not an attribute in table", str(table_name))
                     join_valid = False 
+
+                # Check if the second table has the join attribute
+                table_name = table_matches[table_index + 1]
+                # Assuming every table has at least one chunk allocated to it (even when empty)
+                table_path = tables_path + table_name + "/chunk0.csv"
+                file_df = pd.read_csv(table_path)
+                # Case sentitive join attribute names
+                join_condition_attribute = str(join_condition_attribute)
+                file_df_columns = list(file_df.columns)
+                if join_condition_attribute not in file_df_columns: 
+                    print(str(join_condition_attribute), "is not an attribute in table", str(table_name))
+                    join_valid = False 
+
+                print("The join attribute", join_condition_attribute, "is valid.")
             
         if not join_valid: 
-            print("The join could not be performed.")
+            print("\nThe join could not be performed. The column names in the join conditions do not exist.")
             return ""
+        print("\nAll the join attributes are valid. Proceeding to the join.\n")
 
         # Join the tables
-        # for join_condition_attribute in combined_via_matches: 
         tables_path = "./Output-Data/"
-        table_name = (table_matches[0]).lower()
-        table_path = tables_path + str(table_name) + ".csv"
-        print("Getting table", str(table_name), "initially...")
-        select_df = pd.read_csv(table_path)
 
         if len(table_matches) > 1:
             for table_name_index in range(1, len(table_matches)): 
-                table_name = (table_matches[table_name_index]).lower()
-                table_path = tables_path + table_name + ".csv"
-                second_select_df = pd.read_csv(table_path)
-                print("\nJoining table", table_name + "...")
-                try: 
-                    join_attribute = str(combined_via_matches[table_name_index - 1])
-                    select_df = pd.merge(select_df, second_select_df, on=join_attribute)
-                    print("Merging on the attribute", join_attribute)
-                    print("Here is the shape of the new table thus far.")
-                    print(select_df.shape)
-                    print("The join is complete between the 2 tables...")
-                except: 
-                    print("The join failed.")
-                    print("The error occured when joining on the attribute", combined_via_matches[table_name_index - 1], "and with the table", table_matches[table_name_index])
-        print("\nHere is the shape of the final table after the joins:")
+                if table_name_index == 1:
+                    join_results = []
+
+                    # Nested loop join, where the outer relation is the one with all the joined output
+                    outer_table = tables_path + table_matches[table_name_index - 1] 
+                    table1_chunks = os.listdir(outer_table)
+                    for table1_chunk in table1_chunks:
+                        with open(outer_table + "/" + table1_chunk, 'r') as outer_table_chunk:
+                            outer_reader = csv.DictReader(outer_table_chunk)
+                            outer_chunk_data = list(outer_reader)
+                        
+                            inner_table = tables_path + table_matches[table_name_index]
+                            table2_chunks = os.listdir(inner_table)
+                            for table2_chunk in table2_chunks:
+                                with open(inner_table + "/" + table2_chunk, 'r') as inner_table_chunk:
+                                    inner_reader = csv.DictReader(inner_table_chunk)
+                                    inner_chunk_data = list(inner_reader)
+
+                                    for outer_row in outer_chunk_data:
+                                        for inner_row in inner_chunk_data:
+                                            join_condition_met = all(outer_row[join_col] == inner_row[join_col] for join_col in [combined_via_matches[table_name_index - 1]])
+                                            if join_condition_met:
+                                                joined_row = {col: outer_row[col] for col in outer_row}
+                                                for col in inner_row:
+                                                    joined_row[col + "_right"] = inner_row[col]
+                                                join_results.append(joined_row)
+                    
+                    # Save the joined results in a temporary csv (i.e. "output buffer")
+                    with open("temp.csv", 'w', newline='') as temp_join_output_csv:
+                        fieldnames = list(outer_chunk_data[0].keys()) + [col + "_right" for col in inner_chunk_data[0].keys()]
+                        writer = csv.DictWriter(temp_join_output_csv, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(join_results)
+                    print(join_results)
+                else: 
+                    # Now use the temp output table as the outer query after joining the first two relations if there are more than two relations that need to be joined
+                    join_results = []
+
+                    # Nested loop join, where the outer relation is the one with all the joined output
+                    with open("temp.csv", 'r') as outer_relation:
+                        outer_reader = csv.DictReader(outer_relation)
+                        outer_data = list(outer_reader)
+                    
+                        inner_table = tables_path + table_matches[table_name_index]
+                        table2_chunks = os.listdir(inner_table)
+                        for table2_chunk in table2_chunks:
+                            with open(inner_table + "/" + table2_chunk, 'r') as inner_table_chunk:
+                                inner_reader = csv.DictReader(inner_table_chunk)
+                                inner_chunk_data = list(inner_reader)
+
+                                for outer_row in outer_data:
+                                    for inner_row in inner_chunk_data:
+                                        join_condition_met = all(outer_row[join_col] == inner_row[join_col] for join_col in [combined_via_matches[table_name_index - 1]])
+                                        if join_condition_met:
+                                            joined_row = {col: outer_row[col] for col in outer_row}
+                                            for col in inner_row:
+                                                joined_row[col + "_inner"] = inner_row[col]
+                                            join_results.append(joined_row)
+                                            # joined_row = {**outer_row, **inner_row}
+                                            # join_results.append(joined_row)
+                
+                    # Save the joined results in a temporary csv (i.e. "output buffer")
+                    with open("temp.csv", 'w', newline='') as temp_join_output_csv:
+                        fieldnames = list(outer_data[0].keys()) + [col + "_inner" for col in inner_chunk_data[0].keys()]
+                        writer = csv.DictWriter(temp_join_output_csv, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(join_results)
+                    print(join_results)
+        
+        # Remove the output buffer (temporary page holding the joined output results)
+        select_df = pd.read_csv("temp.csv")
+        os.remove("temp.csv")
+
+        print("\n\nHere is the shape of the final table after the joins:")
         print(select_df.shape)
+        print("\n\n")
         print(select_df.head())
     else: 
-        tables_path = "./Output-Data/"
-        table_name = (table_matches[0]).lower()
-        table_path = tables_path + str(table_name) + ".csv"
-        select_df = pd.read_csv(table_path)
+        print("\nNo join conditions identifed. Proceeding to the next operator in the query pipeline.")
+        print("Identified only one table entered in the select statement as no join condition with another table was inputted.")
+        table_name = table_matches[0]
+        print("The identified table name is " + str(table_name) + "\n\n\n")
+
 
     # Filter the table
-    select_df_columns = [column.lower() for column in list(select_df.columns)]
-    filter_expression = None
-    str_filter_expression = None
-    if filter_match: 
-        filter_conditions = str(filter_match[1]).split("and")
-        print(filter_conditions)
-        # Loop through the table columns to ensure valid column names were inputted 
-        for filter_condition in filter_conditions: 
-            print("\nThis is the filter condition being dissected.")
-            print(filter_condition.strip())
+    # select_df_columns = [column.lower() for column in list(select_df.columns)]
+    # filter_expression = None
+    # str_filter_expression = None
+    # if filter_match: 
+    #     filter_conditions = str(filter_match[1]).split("and")
+    #     print(filter_conditions)
+    #     # Loop through the table columns to ensure valid column names were inputted 
+    #     for filter_condition in filter_conditions: 
+    #         print("\nThis is the filter condition being dissected.")
+    #         print(filter_condition.strip())
 
-            filter_condition_components = filter_condition.strip().split("-")
+    #         filter_condition_components = filter_condition.strip().split("-")
 
-            # The select condition must have a column name, a comparison phrase, and a value 
-            # The value should be after the "-", hence why the condition should always be split into two 
-            if (len(filter_condition_components) == 2):
+    #         # The select condition must have a column name, a comparison phrase, and a value 
+    #         # The value should be after the "-", hence why the condition should always be split into two 
+    #         if (len(filter_condition_components) == 2):
 
-                column_and_operation_phrase = filter_condition_components[0].strip()
-                value = filter_condition_components[1].strip()
+    #             column_and_operation_phrase = filter_condition_components[0].strip()
+    #             value = filter_condition_components[1].strip()
 
-                # Identify the appropriate column
-                identified_column = ""
-                found_column = False
-                for column in select_df_columns: 
-                    if column in column_and_operation_phrase: 
-                        identified_column = column
-                        found_column = True
+    #             # Identify the appropriate column
+    #             identified_column = ""
+    #             found_column = False
+    #             for column in select_df_columns: 
+    #                 if column in column_and_operation_phrase: 
+    #                     identified_column = column
+    #                     found_column = True
                 
-                if not found_column: 
-                    print("\nNo valid column could be identified in the phrase:\n", column_and_operation_phrase)
-                    print("These are the valid column names for this table so far. Capitalization does matter for column names.")
-                    print(select_df_columns)
-                    identified_column = None
-                    return ""
+    #             if not found_column: 
+    #                 print("\nNo valid column could be identified in the phrase:\n", column_and_operation_phrase)
+    #                 print("These are the valid column names for this table so far. Capitalization does matter for column names.")
+    #                 print(select_df_columns)
+    #                 identified_column = None
+    #                 return ""
 
 
-                # Identify the appropriate comparison operator and build the filter expression
-                column_and_operation_phrase = str(column_and_operation_phrase).lower()
-                if "equal to" in column_and_operation_phrase:
-                    value = float(value)
-                    condition = (select_df[identified_column] == value)
-                    if str_filter_expression is None:
-                            str_filter_expression = "(select_df[" + str(identified_column) + "] == " + str(value) + ")"
-                    else: 
-                        str_filter_expression += "& (select_df[" + str(identified_column) + "] == " + str(value) + ")"
-                elif "less than" in column_and_operation_phrase:
-                    value = float(value)
-                    condition = (select_df[identified_column] < value)
-                    if str_filter_expression is None:
-                            str_filter_expression = "(select_df[" + str(identified_column) + "] < " + str(value) + ")"
-                    else: 
-                        str_filter_expression += "& (select_df[" + str(identified_column) + "] < " + str(value) + ")"
-                elif "greater than" in column_and_operation_phrase:
-                    value = float(value)
-                    condition = (select_df[identified_column] > value)
-                    if str_filter_expression is None:
-                            str_filter_expression = "(select_df[" + str(identified_column) + "] > " + str(value) + ")"
-                    else: 
-                        str_filter_expression += "& (select_df[" + str(identified_column) + "] > " + str(value) + ")"
-                elif "less than or equal to" in column_and_operation_phrase:
-                    value = float(value)
-                    condition = (select_df[identified_column] <= value)
-                    if str_filter_expression is None:
-                            str_filter_expression = "(select_df[" + str(identified_column) + "] <= " + str(value) + ")"
-                    else: 
-                        str_filter_expression += "& (select_df[" + str(identified_column) + "] <= " + str(value) + ")"
-                elif "greater than or equal to" in column_and_operation_phrase:
-                    value = float(value)
-                    condition = (select_df[identified_column] >= value)
-                    if str_filter_expression is None:
-                            str_filter_expression = "(select_df[" + str(identified_column) + "] >= " + str(value) + ")"
-                    else: 
-                        str_filter_expression += "& (select_df[" + str(identified_column) + "] >= " + str(value) + ")"
-                elif "like" in column_and_operation_phrase:
-                    condition = select_df[identified_column].str.contains(str(value), case=False)
-                    if str_filter_expression is None:
-                            str_filter_expression = "(select_df[" + str(identified_column) + "] LIKE " + str(value) + ")"
-                    else: 
-                        str_filter_expression += "& (select_df[" + str(identified_column) + "] LIKE " + str(value) + ")"
-                else: 
-                    condition = None
-                    print("\nNo valid comparison phrase, like 'greater than' or 'like', could be identified in the select phrase.")
-                    print("Please try again.")
-                    print("Exiting the select operation.")
-                    return ""
+    #             # Identify the appropriate comparison operator and build the filter expression
+    #             column_and_operation_phrase = str(column_and_operation_phrase).lower()
+    #             if "equal to" in column_and_operation_phrase:
+    #                 value = float(value)
+    #                 condition = (select_df[identified_column] == value)
+    #                 if str_filter_expression is None:
+    #                         str_filter_expression = "(select_df[" + str(identified_column) + "] == " + str(value) + ")"
+    #                 else: 
+    #                     str_filter_expression += "& (select_df[" + str(identified_column) + "] == " + str(value) + ")"
+    #             elif "less than" in column_and_operation_phrase:
+    #                 value = float(value)
+    #                 condition = (select_df[identified_column] < value)
+    #                 if str_filter_expression is None:
+    #                         str_filter_expression = "(select_df[" + str(identified_column) + "] < " + str(value) + ")"
+    #                 else: 
+    #                     str_filter_expression += "& (select_df[" + str(identified_column) + "] < " + str(value) + ")"
+    #             elif "greater than" in column_and_operation_phrase:
+    #                 value = float(value)
+    #                 condition = (select_df[identified_column] > value)
+    #                 if str_filter_expression is None:
+    #                         str_filter_expression = "(select_df[" + str(identified_column) + "] > " + str(value) + ")"
+    #                 else: 
+    #                     str_filter_expression += "& (select_df[" + str(identified_column) + "] > " + str(value) + ")"
+    #             elif "less than or equal to" in column_and_operation_phrase:
+    #                 value = float(value)
+    #                 condition = (select_df[identified_column] <= value)
+    #                 if str_filter_expression is None:
+    #                         str_filter_expression = "(select_df[" + str(identified_column) + "] <= " + str(value) + ")"
+    #                 else: 
+    #                     str_filter_expression += "& (select_df[" + str(identified_column) + "] <= " + str(value) + ")"
+    #             elif "greater than or equal to" in column_and_operation_phrase:
+    #                 value = float(value)
+    #                 condition = (select_df[identified_column] >= value)
+    #                 if str_filter_expression is None:
+    #                         str_filter_expression = "(select_df[" + str(identified_column) + "] >= " + str(value) + ")"
+    #                 else: 
+    #                     str_filter_expression += "& (select_df[" + str(identified_column) + "] >= " + str(value) + ")"
+    #             elif "like" in column_and_operation_phrase:
+    #                 condition = select_df[identified_column].str.contains(str(value), case=False)
+    #                 if str_filter_expression is None:
+    #                         str_filter_expression = "(select_df[" + str(identified_column) + "] LIKE " + str(value) + ")"
+    #                 else: 
+    #                     str_filter_expression += "& (select_df[" + str(identified_column) + "] LIKE " + str(value) + ")"
+    #             else: 
+    #                 condition = None
+    #                 print("\nNo valid comparison phrase, like 'greater than' or 'like', could be identified in the select phrase.")
+    #                 print("Please try again.")
+    #                 print("Exiting the select operation.")
+    #                 return ""
                     
-                # Combine the filter expression conditions using logical 'and'
-                if filter_expression is None:
-                    filter_expression = condition
-                else:
-                    filter_expression = filter_expression & condition
-                print("\nThe filter expression has been constructed.")
-                print(filter_expression)
-                print("\nThis is the filter expression:\n" + str_filter_expression)
+    #             # Combine the filter expression conditions using logical 'and'
+    #             if filter_expression is None:
+    #                 filter_expression = condition
+    #             else:
+    #                 filter_expression = filter_expression & condition
+    #             print("\nThe filter expression has been constructed.")
+    #             print(filter_expression)
+    #             print("\nThis is the filter expression:\n" + str_filter_expression)
 
-            # If the condition is not split into two (column name + comparison phrase and the value)
-            else: 
-                print("\nThis select statement was not able to be dissected as it does not contain the key components of a column name, comparison phrase, and a value:")
-                print(filter_condition)
-                print("Thus, exiting the select operation. Please try again.")
-                return ""
+    #         # If the condition is not split into two (column name + comparison phrase and the value)
+    #         else: 
+    #             print("\nThis select statement was not able to be dissected as it does not contain the key components of a column name, comparison phrase, and a value:")
+    #             print(filter_condition)
+    #             print("Thus, exiting the select operation. Please try again.")
+    #             return ""
             
-        # Filter the table
-        if filter_expression is not None:
-            print("\nThese are the identified rows:")
-            # print(select_df[filter_expression])
-            print("There are", str(len(select_df[filter_expression])), "rows that have been identified in the table.")
+    #     # Filter the table
+    #     if filter_expression is not None:
+    #         print("\nThese are the identified rows:")
+    #         # print(select_df[filter_expression])
+    #         print("There are", str(len(select_df[filter_expression])), "rows that have been identified in the table.")
 
-            print("\nFiltering...")
-            print("\n" + str_filter_expression)
-            try: 
-                select_df = select_df[filter_expression]
-                print("Filtered!")
-                print("The table now has", len(select_df) ,"rows")
-                # If the table has 0 rows, there is no purpose in continuing to aggregations, grouping, ordering, and projection
-                if (len(select_df) == 0): 
-                    return "\nThe table has 0 rows, so cannot proceed further in the select operation."
-            except: 
-                print("There was an error filtering. Please try again.")
-        else:
-            print("No valid filter expression could be constructured from the inputted select command.")
+    #         print("\nFiltering...")
+    #         print("\n" + str_filter_expression)
+    #         try: 
+    #             select_df = select_df[filter_expression]
+    #             print("Filtered!")
+    #             print("The table now has", len(select_df) ,"rows")
+    #             # If the table has 0 rows, there is no purpose in continuing to aggregations, grouping, ordering, and projection
+    #             if (len(select_df) == 0): 
+    #                 return "\nThe table has 0 rows, so cannot proceed further in the select operation."
+    #         except: 
+    #             print("There was an error filtering. Please try again.")
+    #     else:
+    #         print("No valid filter expression could be constructured from the inputted select command.")
 
 
-    # Group By On The table
-    # Check if there is group by 
-    select_df_columns = [column for column in list(select_df.columns)]
-    verified_group_by_columns = []
-    column_and_aggregation = {}
-    print("\nTesting")
-    print(group_by_matches)
-    print(type(group_by_matches))
-    if group_by_matches: 
-        group_by_matches = group_by_matches[0]
-        print(group_by_matches)
-        # Need to split the different group by attributes if there are multiple
-        if "," in group_by_matches: 
-            print("split")
-            group_by_matches = group_by_matches.split(",")
-        else: 
-            group_by_matches = [group_by_matches]
+    # # Group By On The table
+    # # Check if there is group by 
+    # select_df_columns = [column for column in list(select_df.columns)]
+    # verified_group_by_columns = []
+    # column_and_aggregation = {}
+    # print("\nTesting")
+    # print(group_by_matches)
+    # print(type(group_by_matches))
+    # if group_by_matches: 
+    #     group_by_matches = group_by_matches[0]
+    #     print(group_by_matches)
+    #     # Need to split the different group by attributes if there are multiple
+    #     if "," in group_by_matches: 
+    #         print("split")
+    #         group_by_matches = group_by_matches.split(",")
+    #     else: 
+    #         group_by_matches = [group_by_matches]
 
-        for group_by in group_by_matches:
-            print("\n\nIdentifed group by attribute:\n", group_by)
-            group_by = group_by.strip()
-            if group_by in select_df_columns: 
-                print("This attribute", group_by, "is a valid column in the table.")
-                verified_group_by_columns.append(group_by.strip())
-            else: 
-                print("This attribute", group_by, "is not a valid column in the table.")
-                print("Exiting. Please enter a valid attribute name.")
-                print("Here is a list of valid attriubtes to group on:")
-                print(select_df_columns)
-                return ""
+    #     for group_by in group_by_matches:
+    #         print("\n\nIdentifed group by attribute:\n", group_by)
+    #         group_by = group_by.strip()
+    #         if group_by in select_df_columns: 
+    #             print("This attribute", group_by, "is a valid column in the table.")
+    #             verified_group_by_columns.append(group_by.strip())
+    #         else: 
+    #             print("This attribute", group_by, "is not a valid column in the table.")
+    #             print("Exiting. Please enter a valid attribute name.")
+    #             print("Here is a list of valid attriubtes to group on:")
+    #             print(select_df_columns)
+    #             return ""
             
-        print("\nThere must be a valid aggregation function accompanying the group by.")
-        print("Checking for an aggregation function.")
-        # Check for the aggregation function in the SELECT/projection condition
-        select_conditions = str(select_match[1]).split("and")
-        print(select_conditions)
-        # Loop through the table columns to ensure valid column names were inputted 
-        for select_condition in select_conditions: 
-            print("\nThis is the select condition being dissected to look for an aggregation function.")
-            print(select_condition.strip())
+    #     print("\nThere must be a valid aggregation function accompanying the group by.")
+    #     print("Checking for an aggregation function.")
+    #     # Check for the aggregation function in the SELECT/projection condition
+    #     select_conditions = str(select_match[1]).split("and")
+    #     print(select_conditions)
+    #     # Loop through the table columns to ensure valid column names were inputted 
+    #     for select_condition in select_conditions: 
+    #         print("\nThis is the select condition being dissected to look for an aggregation function.")
+    #         print(select_condition.strip())
 
-            column_and_operation_phrase = select_condition.strip()
+    #         column_and_operation_phrase = select_condition.strip()
 
-            # Identify the appropriate column
-            identified_column = ""
-            found_column = False
-            for column in select_df_columns: 
-                if column in column_and_operation_phrase: 
-                    identified_column = column
-                    found_column = True
+    #         # Identify the appropriate column
+    #         identified_column = ""
+    #         found_column = False
+    #         for column in select_df_columns: 
+    #             if column in column_and_operation_phrase: 
+    #                 identified_column = column
+    #                 found_column = True
             
-            if not found_column: 
-                print("\nNo valid column could be identified in the phrase:\n", column_and_operation_phrase)
-                print("These are the valid column names for this table so far. Capitalization does matter for column names.")
-                print(select_df_columns)
-                identified_column = None
-                return ""
+    #         if not found_column: 
+    #             print("\nNo valid column could be identified in the phrase:\n", column_and_operation_phrase)
+    #             print("These are the valid column names for this table so far. Capitalization does matter for column names.")
+    #             print(select_df_columns)
+    #             identified_column = None
+    #             return ""
             
-            column_and_operation_phrase = column_and_operation_phrase.lower()
-            if "sum" in column_and_operation_phrase: 
-                print("\nAggregating attribute", identified_column , "via sum")
-                column_and_aggregation[identified_column] = "sum"
-            elif "mean" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via mean or average")
-                column_and_aggregation[identified_column] = "mean"
-            elif "max" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via max")
-                column_and_aggregation[identified_column] = "max"
-            elif "min" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via min")
-                column_and_aggregation[identified_column] = "min"
-            elif "std" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via std")
-                column_and_aggregation[identified_column] = "std"
-            elif "var" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via var")
-                column_and_aggregation[identified_column] = "var"
-            elif "count" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via count")
-                column_and_aggregation[identified_column] = "count"
-            else: 
-                print("\nNo valid aggregation operation identified.")
-                print("\nNo valid aggregation operation identified.")
-                print("These are the valid aggregation functions:")
-                print("sum, mean, max, min, std, var, count")
-                return ""
+    #         column_and_operation_phrase = column_and_operation_phrase.lower()
+    #         if "sum" in column_and_operation_phrase: 
+    #             print("\nAggregating attribute", identified_column , "via sum")
+    #             column_and_aggregation[identified_column] = "sum"
+    #         elif "mean" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via mean or average")
+    #             column_and_aggregation[identified_column] = "mean"
+    #         elif "max" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via max")
+    #             column_and_aggregation[identified_column] = "max"
+    #         elif "min" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via min")
+    #             column_and_aggregation[identified_column] = "min"
+    #         elif "std" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via std")
+    #             column_and_aggregation[identified_column] = "std"
+    #         elif "var" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via var")
+    #             column_and_aggregation[identified_column] = "var"
+    #         elif "count" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via count")
+    #             column_and_aggregation[identified_column] = "count"
+    #         else: 
+    #             print("\nNo valid aggregation operation identified.")
+    #             print("\nNo valid aggregation operation identified.")
+    #             print("These are the valid aggregation functions:")
+    #             print("sum, mean, max, min, std, var, count")
+    #             return ""
         
-        # Once aggregation check passes, different group by if there is one group by or multiple group by attributes 
-        column_and_aggregation_str = ', '.join(f"'{key}': {value}" if isinstance(value, list) else f"'{key}': '{value}'" for key, value in column_and_aggregation.items())
-        # single group by attribute
-        if (len(verified_group_by_columns) == 1): 
-            print("\nGrouping and aggregating.")
-            print("Here is the statement.")
-            print(f"select_df = select_df.groupby('{verified_group_by_columns[0]}').agg({{{column_and_aggregation_str}}})")
-            try:
-                print()
-                select_df = select_df.groupby(verified_group_by_columns[0]).agg(column_and_aggregation)
-                print("\nGroup By Complete.")
-                print("Here is the output of the group by.")
-                print(select_df)
-            except: 
-                print("There was an error grouping. Please check capitalizations and valid attributes and aggregations please.")
-                print("Exiting, please try again.")
-                return ""
+    #     # Once aggregation check passes, different group by if there is one group by or multiple group by attributes 
+    #     column_and_aggregation_str = ', '.join(f"'{key}': {value}" if isinstance(value, list) else f"'{key}': '{value}'" for key, value in column_and_aggregation.items())
+    #     # single group by attribute
+    #     if (len(verified_group_by_columns) == 1): 
+    #         print("\nGrouping and aggregating.")
+    #         print("Here is the statement.")
+    #         print(f"select_df = select_df.groupby('{verified_group_by_columns[0]}').agg({{{column_and_aggregation_str}}})")
+    #         try:
+    #             print()
+    #             select_df = select_df.groupby(verified_group_by_columns[0]).agg(column_and_aggregation)
+    #             print("\nGroup By Complete.")
+    #             print("Here is the output of the group by.")
+    #             print(select_df)
+    #         except: 
+    #             print("There was an error grouping. Please check capitalizations and valid attributes and aggregations please.")
+    #             print("Exiting, please try again.")
+    #             return ""
 
-        # multiple group by attributes
-        else: 
-            print("\nGrouping and aggregating.")
-            print("Here is the statement.")
-            print(f"select_df = select_df.groupby('{verified_group_by_columns}').agg({{{column_and_aggregation_str}}})")
-            try: 
-                print(column_and_aggregation_str)
-                print()
-                select_df.groupby(verified_group_by_columns).agg(column_and_aggregation)
-                print("\nGroup By Complete.")
-                print("Here is the output of the group by.")
-                print(select_df)
-            except: 
-                print("There was an error grouping. Please check capitalizations and valid attributes and aggregations please.")
-                print("Exiting, please try again.")
-                return ""
-    # Non Group By Aggregation 
-    # If there is no group by, need to check if there is still aggregation 
-    else: 
-        print("\nNo GROUP BY identified. Moving onto aggregation.")
-        # If there is no group by, aggregate on columns 
-        column_and_aggregation = {}
-        print("\nChecking for an aggregation function.")
-        # Check for the aggregation function in the SELECT/projection condition
-        select_conditions = str(select_match[1]).split("and")
-        print(select_conditions)
-        # Loop through the table columns to ensure valid column names were inputted 
-        for select_condition in select_conditions: 
-            print("\nThis is the select condition being dissected to look for an aggregation function.")
-            print(select_condition.strip())
+    #     # multiple group by attributes
+    #     else: 
+    #         print("\nGrouping and aggregating.")
+    #         print("Here is the statement.")
+    #         print(f"select_df = select_df.groupby('{verified_group_by_columns}').agg({{{column_and_aggregation_str}}})")
+    #         try: 
+    #             print(column_and_aggregation_str)
+    #             print()
+    #             select_df.groupby(verified_group_by_columns).agg(column_and_aggregation)
+    #             print("\nGroup By Complete.")
+    #             print("Here is the output of the group by.")
+    #             print(select_df)
+    #         except: 
+    #             print("There was an error grouping. Please check capitalizations and valid attributes and aggregations please.")
+    #             print("Exiting, please try again.")
+    #             return ""
+    # # Non Group By Aggregation 
+    # # If there is no group by, need to check if there is still aggregation 
+    # else: 
+    #     print("\nNo GROUP BY identified. Moving onto aggregation.")
+    #     # If there is no group by, aggregate on columns 
+    #     column_and_aggregation = {}
+    #     print("\nChecking for an aggregation function.")
+    #     # Check for the aggregation function in the SELECT/projection condition
+    #     select_conditions = str(select_match[1]).split("and")
+    #     print(select_conditions)
+    #     # Loop through the table columns to ensure valid column names were inputted 
+    #     for select_condition in select_conditions: 
+    #         print("\nThis is the select condition being dissected to look for an aggregation function.")
+    #         print(select_condition.strip())
 
-            column_and_operation_phrase = select_condition.strip()
+    #         column_and_operation_phrase = select_condition.strip()
 
-            # Identify the appropriate column
-            identified_column = ""
-            found_column = False
-            for column in select_df_columns: 
-                if column in column_and_operation_phrase: 
-                    identified_column = column
-                    found_column = True
+    #         # Identify the appropriate column
+    #         identified_column = ""
+    #         found_column = False
+    #         for column in select_df_columns: 
+    #             if column in column_and_operation_phrase: 
+    #                 identified_column = column
+    #                 found_column = True
             
-            if not found_column: 
-                print("\nNo valid column could be identified in the phrase:\n", column_and_operation_phrase)
-                print("These are the valid column names for this table so far. Capitalization does matter for column names.")
-                print(select_df_columns)
-                identified_column = None
-                return ""
+    #         if not found_column: 
+    #             print("\nNo valid column could be identified in the phrase:\n", column_and_operation_phrase)
+    #             print("These are the valid column names for this table so far. Capitalization does matter for column names.")
+    #             print(select_df_columns)
+    #             identified_column = None
+    #             return ""
             
-            column_and_operation_phrase = column_and_operation_phrase.lower()
-            if "sum" in column_and_operation_phrase: 
-                print("\nAggregating attribute", identified_column , "via sum")
-                column_and_aggregation[identified_column] = "sum"
-            elif "mean" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via mean or average")
-                column_and_aggregation[identified_column] = "mean"
-            elif "max" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via max")
-                column_and_aggregation[identified_column] = "max"
-            elif "min" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via min")
-                column_and_aggregation[identified_column] = "min"
-            elif "std" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via std")
-                column_and_aggregation[identified_column] = "std"
-            elif "var" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via var")
-                column_and_aggregation[identified_column] = "var"
-            elif "count" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via count")
-                column_and_aggregation[identified_column] = "count"
-            else: 
-                print("\nNo valid aggregation operation identified.")
-                print("\nNo valid aggregation operation identified.")
-                print("These are the valid aggregation functions:")
-                print("sum, mean, max, min, std, var, count")
-                return ""
+    #         column_and_operation_phrase = column_and_operation_phrase.lower()
+    #         if "sum" in column_and_operation_phrase: 
+    #             print("\nAggregating attribute", identified_column , "via sum")
+    #             column_and_aggregation[identified_column] = "sum"
+    #         elif "mean" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via mean or average")
+    #             column_and_aggregation[identified_column] = "mean"
+    #         elif "max" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via max")
+    #             column_and_aggregation[identified_column] = "max"
+    #         elif "min" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via min")
+    #             column_and_aggregation[identified_column] = "min"
+    #         elif "std" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via std")
+    #             column_and_aggregation[identified_column] = "std"
+    #         elif "var" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via var")
+    #             column_and_aggregation[identified_column] = "var"
+    #         elif "count" in column_and_operation_phrase:
+    #             print("\nAggregating attribute", identified_column , "via count")
+    #             column_and_aggregation[identified_column] = "count"
+    #         else: 
+    #             print("\nNo valid aggregation operation identified.")
+    #             print("\nNo valid aggregation operation identified.")
+    #             print("These are the valid aggregation functions:")
+    #             print("sum, mean, max, min, std, var, count")
+    #             return ""
             
-        print("\nAggregating.")
-        print("Here is the statement.")
-        print(f"select_df = select_df.agg({{{column_and_aggregation}}})")
-        try:
-            print()
-            select_df = select_df.agg(column_and_aggregation)
-            print("\nAggregation Complete.")
-            print("Here is the output of the aggregation.")
-            print(select_df)
-        except: 
-            print("\nThere was an error with the aggregation. Please check capitalizations and aggregation-attribute pairings please.")
-            print("You can only use aggregations like sum on numerical attributes.")
-            print("Exiting, please try again.")
-            return ""
+    #     print("\nAggregating.")
+    #     print("Here is the statement.")
+    #     print(f"select_df = select_df.agg({{{column_and_aggregation}}})")
+    #     try:
+    #         print()
+    #         select_df = select_df.agg(column_and_aggregation)
+    #         print("\nAggregation Complete.")
+    #         print("Here is the output of the aggregation.")
+    #         print(select_df)
+    #     except: 
+    #         print("\nThere was an error with the aggregation. Please check capitalizations and aggregation-attribute pairings please.")
+    #         print("You can only use aggregations like sum on numerical attributes.")
+    #         print("Exiting, please try again.")
+    #         return ""
     
-    print("\nGrouping and Aggregation Complete")
+    # print("\nGrouping and Aggregation Complete")
 
-    # Ordering
-    select_df_columns = list(select_df.columns)
-    ordering_dict = {}
-    if order_by_matches: 
-        print("\n\n\nChecking for ordering conditions.")
-        for order_by in order_by_matches: 
-            print("Identified the ordering condition:\n", order_by)
-            order_by = order_by.split(" ")
-            attribute = order_by[0].strip()
-            ordering = order_by[1].strip().lower()
-            print(attribute)
-            print(ordering)
-            if (ordering == "ascending"): 
-                print("Identified the ordering as ascending.")
-                order = True
-            elif (ordering == "descending"): 
-                print("Identified the ordering as descending.")
-                order = False
-            else: 
-                print("\nCould not identify a valid ordering. Please enter 'ascending' or 'descending' next to the attribute name in any capitalization.")
-                print("Exiting, please try again.")
-                order = True
-                return ""
+    # # Ordering
+    # select_df_columns = list(select_df.columns)
+    # ordering_dict = {}
+    # if order_by_matches: 
+    #     print("\n\n\nChecking for ordering conditions.")
+    #     for order_by in order_by_matches: 
+    #         print("Identified the ordering condition:\n", order_by)
+    #         order_by = order_by.split(" ")
+    #         attribute = order_by[0].strip()
+    #         ordering = order_by[1].strip().lower()
+    #         print(attribute)
+    #         print(ordering)
+    #         if (ordering == "ascending"): 
+    #             print("Identified the ordering as ascending.")
+    #             order = True
+    #         elif (ordering == "descending"): 
+    #             print("Identified the ordering as descending.")
+    #             order = False
+    #         else: 
+    #             print("\nCould not identify a valid ordering. Please enter 'ascending' or 'descending' next to the attribute name in any capitalization.")
+    #             print("Exiting, please try again.")
+    #             order = True
+    #             return ""
 
-            print("The attribute identified is:\n", attribute)
-            identified_column = ""
-            found_column = False
-            for column in select_df_columns: 
-                if column in column_and_operation_phrase: 
-                    identified_column = column
-                    found_column = True        
+    #         print("The attribute identified is:\n", attribute)
+    #         identified_column = ""
+    #         found_column = False
+    #         for column in select_df_columns: 
+    #             if column in column_and_operation_phrase: 
+    #                 identified_column = column
+    #                 found_column = True        
 
-            if not found_column: 
-                print("\nNo valid column could be identified in the phrase:\n", column_and_operation_phrase)
-                print("These are the valid column names for this table so far. Capitalization does matter for column names.")
-                print(select_df_columns)
-                identified_column = None
-                return ""
+    #         if not found_column: 
+    #             print("\nNo valid column could be identified in the phrase:\n", column_and_operation_phrase)
+    #             print("These are the valid column names for this table so far. Capitalization does matter for column names.")
+    #             print(select_df_columns)
+    #             identified_column = None
+    #             return ""
 
-            ordering_dict[attribute] = order
+    #         ordering_dict[attribute] = order
 
-        print("\nOrdering.")
-        print("Here is the statement.")
-        # sort_values differs for ordering by a single and multiple columns 
-        if (len(ordering_dict) == 1):
-            print(f"select_df = select_df.sort_values(by='{attribute}', ascending={ordering_dict[attribute]})")
-            try:
-                print()
-                print(attribute)
-                print(bool(ordering_dict[attribute]))
-                select_df = select_df.sort_values(by=attribute, ascending=bool(ordering_dict[attribute]))
-                print("\nOrdering Complete.")
-                print("Here is the output of the ordering.")
-                print(select_df)
-            except: 
-                try: 
-                    select_df = select_df.sort_values(ascending=bool(ordering_dict[attribute]))
-                    print("\nOrdering Complete.")
-                    print("Here is the output of the ordering.")
-                    print(select_df)
-                except:
-                    print("\nThere was an error with the ordering. Please check capitalizations and ascending/descending please.")
-                    print("\nOne potential error could also be that there are too many order by attributes relative to the columns after the filtering, grouping, and aggregation.")
-                    print("Exiting, please try again.")
-                    return ""
-        else: 
-            ordering_keys = list(ordering_dict.keys())
-            ordering_values = list(ordering_dict.values())
-            print(f"select_df = select_df.sort_values(by={ordering_keys}, ascending={ordering_values})")
-            try:
-                print()
-                select_df = select_df.sort_values(by=ordering_keys, ascending=ordering_values)
-                print("\nOrdering Complete.")
-                print("Here is the output of the ordering.")
-                print(select_df)
-            except: 
-                try:
-                    print()
-                    select_df = select_df.sort_values(by=ordering_keys, ascending=ordering_values)
-                    print("\nOrdering Complete.")
-                    print("Here is the output of the ordering.")
-                    print(select_df)
-                except: 
-                    print("\nThere was an error with the ordering. Please check capitalizations and ascending/descending please.")
-                    print("\nOne potential error could also be that there are too many order by attributes relative to the columns after the filtering, grouping, and aggregation.")
-                    print("There are", len(ordering_keys), "attributes to order by.")
-                    print("However, the table only has", len(list(select_df.columns)), "columns.")
-                    print("Exiting, please try again.")
-                    return ""
+    #     print("\nOrdering.")
+    #     print("Here is the statement.")
+    #     # sort_values differs for ordering by a single and multiple columns 
+    #     if (len(ordering_dict) == 1):
+    #         print(f"select_df = select_df.sort_values(by='{attribute}', ascending={ordering_dict[attribute]})")
+    #         try:
+    #             print()
+    #             print(attribute)
+    #             print(bool(ordering_dict[attribute]))
+    #             select_df = select_df.sort_values(by=attribute, ascending=bool(ordering_dict[attribute]))
+    #             print("\nOrdering Complete.")
+    #             print("Here is the output of the ordering.")
+    #             print(select_df)
+    #         except: 
+    #             try: 
+    #                 select_df = select_df.sort_values(ascending=bool(ordering_dict[attribute]))
+    #                 print("\nOrdering Complete.")
+    #                 print("Here is the output of the ordering.")
+    #                 print(select_df)
+    #             except:
+    #                 print("\nThere was an error with the ordering. Please check capitalizations and ascending/descending please.")
+    #                 print("\nOne potential error could also be that there are too many order by attributes relative to the columns after the filtering, grouping, and aggregation.")
+    #                 print("Exiting, please try again.")
+    #                 return ""
+    #     else: 
+    #         ordering_keys = list(ordering_dict.keys())
+    #         ordering_values = list(ordering_dict.values())
+    #         print(f"select_df = select_df.sort_values(by={ordering_keys}, ascending={ordering_values})")
+    #         try:
+    #             print()
+    #             select_df = select_df.sort_values(by=ordering_keys, ascending=ordering_values)
+    #             print("\nOrdering Complete.")
+    #             print("Here is the output of the ordering.")
+    #             print(select_df)
+    #         except: 
+    #             try:
+    #                 print()
+    #                 select_df = select_df.sort_values(by=ordering_keys, ascending=ordering_values)
+    #                 print("\nOrdering Complete.")
+    #                 print("Here is the output of the ordering.")
+    #                 print(select_df)
+    #             except: 
+    #                 print("\nThere was an error with the ordering. Please check capitalizations and ascending/descending please.")
+    #                 print("\nOne potential error could also be that there are too many order by attributes relative to the columns after the filtering, grouping, and aggregation.")
+    #                 print("There are", len(ordering_keys), "attributes to order by.")
+    #                 print("However, the table only has", len(list(select_df.columns)), "columns.")
+    #                 print("Exiting, please try again.")
+    #                 return ""
 
-    # Projection
-    select_df_columns = list(select_df.columns)
-    if select_match: 
-        print("\n\n\nProjecting.")
+    # # Projection
+    # select_df_columns = list(select_df.columns)
+    # if select_match: 
+    #     print("\n\n\nProjecting.")
         
 
 
 
     
-    return ""
+    print("\nSelect operation complete!")
 
 def updateData(): 
     # Display the example prompts for the user
