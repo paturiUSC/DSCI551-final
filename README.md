@@ -7,3 +7,4 @@
 - Is grouping by at most 1 attribute enough?
 
 # to-do
+  - connect the scripts together
