@@ -7,6 +7,3 @@
 - Is grouping by at most 1 attribute enough?
 
 # to-do
-- Select
-    - Add * for projection
-    - ordering, projection
