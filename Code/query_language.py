@@ -270,7 +270,6 @@ def selectData():
                         writer = csv.DictWriter(temp_join_output_csv, fieldnames=fieldnames)
                         writer.writeheader()
                         writer.writerows(join_results)
-                    print(join_results)
                 else: 
                     # Now use the temp output table as the outer query after joining the first two relations if there are more than two relations that need to be joined
                     join_results = []
@@ -489,105 +488,106 @@ def selectData():
             print(select_condition.strip())
 
             select_condition = select_condition.strip()
-
-            # Identify the column first 
-            identified_column = ""
-            found_column = False
-            select_df_columns = list(select_df.columns)
-            for column in select_df_columns: 
-                if column in select_condition: 
-                    identified_column = column
-                    found_column = True
-            
-            if not found_column: 
-                print("\nNo valid column could be identified in the phrase:\n", select_condition)
-                print("These are the valid column names for this table so far. Capitalization does matter for column names.")
-                print(select_df_columns)
-                identified_column = None
-                return ""
-            
-            column_and_operation_phrase = select_condition.lower()
-            if "sum" in column_and_operation_phrase: 
-                print("\nAggregating attribute", identified_column , "via sum")
-                valid_select_conditions[identified_column] = "sum"
-            elif "mean" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via mean or average")
-                valid_select_conditions[identified_column] = "mean"
-            elif "max" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via max")
-                valid_select_conditions[identified_column] = "max"
-            elif "min" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via min")
-                valid_select_conditions[identified_column] = "min"
-            elif "count" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via count")
-                valid_select_conditions[identified_column] = "count"
-            else: 
-                print("\nNo valid aggregation operation identified.")
-                print("These are the valid aggregation functions:")
-                print("sum, mean, max, min, count")
-                # return ""
+            if "*" not in select_condition:
+                # Identify the column first 
+                identified_column = ""
+                found_column = False
+                select_df_columns = list(select_df.columns)
+                for column in select_df_columns: 
+                    if column in select_condition: 
+                        identified_column = column
+                        found_column = True
+                
+                if not found_column: 
+                    print("\nNo valid column could be identified in the phrase:\n", select_condition)
+                    print("These are the valid column names for this table so far. Capitalization does matter for column names.")
+                    print(select_df_columns)
+                    identified_column = None
+                    return ""
+                
+                column_and_operation_phrase = select_condition.lower()
+                if "sum" in column_and_operation_phrase: 
+                    print("\nAggregating attribute", identified_column , "via sum")
+                    valid_select_conditions[identified_column] = "sum"
+                elif "mean" in column_and_operation_phrase:
+                    print("\nAggregating attribute", identified_column , "via mean or average")
+                    valid_select_conditions[identified_column] = "mean"
+                elif "max" in column_and_operation_phrase:
+                    print("\nAggregating attribute", identified_column , "via max")
+                    valid_select_conditions[identified_column] = "max"
+                elif "min" in column_and_operation_phrase:
+                    print("\nAggregating attribute", identified_column , "via min")
+                    valid_select_conditions[identified_column] = "min"
+                elif "count" in column_and_operation_phrase:
+                    print("\nAggregating attribute", identified_column , "via count")
+                    valid_select_conditions[identified_column] = "count"
+                else: 
+                    print("\nNo valid aggregation operation identified.")
+                    print("These are the valid aggregation functions:")
+                    print("sum, mean, max, min, count")
+                    # return ""
 
         # If only one group by condition identified
-        aggregation_attribute = list(valid_select_conditions.keys())[0]
-        name_of_aggregation_operation = valid_select_conditions[aggregation_attribute]
-        if (len(list(valid_select_conditions.keys())) == 1):
-            group_by_attribute = group_by_matches[0]
-            value_attribute = list(valid_select_conditions.keys())[0]
-            print("\nGrouping by the singular group by attribute: ", group_by_attribute)
-            select_dict = select_df.to_dict(orient="records")
-            grouped_data = {}
-            for row in select_dict:
-                category = row[group_by_attribute]
-                value = row[value_attribute]
-            
-                result_dict = {group_by_attribute: [], name_of_aggregation_operation: []}
-                if valid_select_conditions[aggregation_attribute] == "mean":
-                    print("\nGrouping by the mean.")
-                    if category not in grouped_data:
-                        grouped_data[category] = {'Values': [value]}
-                    else:
-                        grouped_data[category]['Values'].append(value)
+        if (valid_select_conditions):
+            aggregation_attribute = list(valid_select_conditions.keys())[0]
+            name_of_aggregation_operation = valid_select_conditions[aggregation_attribute]
+            if (len(list(valid_select_conditions.keys())) == 1):
+                group_by_attribute = group_by_matches[0]
+                value_attribute = list(valid_select_conditions.keys())[0]
+                print("\nGrouping by the singular group by attribute: ", group_by_attribute)
+                select_dict = select_df.to_dict(orient="records")
+                grouped_data = {}
+                for row in select_dict:
+                    category = row[group_by_attribute]
+                    value = row[value_attribute]
+                
+                    result_dict = {group_by_attribute: [], name_of_aggregation_operation: []}
+                    if valid_select_conditions[aggregation_attribute] == "mean":
+                        print("\nGrouping by the mean.")
+                        if category not in grouped_data:
+                            grouped_data[category] = {'Values': [value]}
+                        else:
+                            grouped_data[category]['Values'].append(value)
 
-                    for category, values in grouped_data.items():
-                        result_dict[group_by_attribute].append(category)
-                        result_dict[name_of_aggregation_operation].append(sum(values[name_of_aggregation_operation]) / len(values[name_of_aggregation_operation]))
-                elif valid_select_conditions[aggregation_attribute] == "sum":
-                    print("\nGrouping by the sum.")
-                    if category not in grouped_data:
-                        grouped_data[category] = {name_of_aggregation_operation: value}
-                    else:
-                        grouped_data[category][name_of_aggregation_operation] += value
-                    print(grouped_data)
-                elif valid_select_conditions[aggregation_attribute] == "count":
-                    print("\nGrouping by the count.")
-                    if category not in grouped_data:
-                        grouped_data[category] = {name_of_aggregation_operation: 1}
-                    else:
-                        grouped_data[category][name_of_aggregation_operation] += 1
-                    print(grouped_data)
-                elif valid_select_conditions[aggregation_attribute] == "max":
-                    print("\nGrouping by the max.")
-                    if category not in grouped_data:
-                        grouped_data[category] = {name_of_aggregation_operation: value}
-                    else:
-                        grouped_data[category][name_of_aggregation_operation] = max(grouped_data[category][name_of_aggregation_operation], value)
-                    
-                    print(grouped_data)
-     
-                elif valid_select_conditions[aggregation_attribute] == "min":
-                    print("\nGrouping by the min.")
-                    if category not in grouped_data:
-                        grouped_data[category] = {name_of_aggregation_operation: value}
-                    else:
-                        grouped_data[category][name_of_aggregation_operation] = min(grouped_data[category][name_of_aggregation_operation], value)
+                        for category, values in grouped_data.items():
+                            result_dict[group_by_attribute].append(category)
+                            result_dict[name_of_aggregation_operation].append(sum(values[name_of_aggregation_operation]) / len(values[name_of_aggregation_operation]))
+                    elif valid_select_conditions[aggregation_attribute] == "sum":
+                        print("\nGrouping by the sum.")
+                        if category not in grouped_data:
+                            grouped_data[category] = {name_of_aggregation_operation: value}
+                        else:
+                            grouped_data[category][name_of_aggregation_operation] += value
+                        print(grouped_data)
+                    elif valid_select_conditions[aggregation_attribute] == "count":
+                        print("\nGrouping by the count.")
+                        if category not in grouped_data:
+                            grouped_data[category] = {name_of_aggregation_operation: 1}
+                        else:
+                            grouped_data[category][name_of_aggregation_operation] += 1
+                        print(grouped_data)
+                    elif valid_select_conditions[aggregation_attribute] == "max":
+                        print("\nGrouping by the max.")
+                        if category not in grouped_data:
+                            grouped_data[category] = {name_of_aggregation_operation: value}
+                        else:
+                            grouped_data[category][name_of_aggregation_operation] = max(grouped_data[category][name_of_aggregation_operation], value)
+                        
+                        print(grouped_data)
+        
+                    elif valid_select_conditions[aggregation_attribute] == "min":
+                        print("\nGrouping by the min.")
+                        if category not in grouped_data:
+                            grouped_data[category] = {name_of_aggregation_operation: value}
+                        else:
+                            grouped_data[category][name_of_aggregation_operation] = min(grouped_data[category][name_of_aggregation_operation], value)
 
-            # Now convert the grouped data back to a pdf 
-            select_df = pd.DataFrame({group_by_attribute: list(grouped_data.keys()), name_of_aggregation_operation: [data[name_of_aggregation_operation] for data in grouped_data.values()]})
-            print(select_df)
-        else: 
-            print("\nCan only do aggregation via grouping on one singular attribute, not multiple attributes. Please try again.")
-            return ""
+                # Now convert the grouped data back to a pdf 
+                select_df = pd.DataFrame({group_by_attribute: list(grouped_data.keys()), name_of_aggregation_operation: [data[name_of_aggregation_operation] for data in grouped_data.values()]})
+                print(select_df)
+            else: 
+                print("\nCan only do aggregation via grouping on one singular attribute, not multiple attributes. Please try again.")
+                return ""
     else: 
         print("\nNo group by identified. Proceeding to aggregation.")
 
@@ -597,97 +597,101 @@ def selectData():
         print(select_conditions)
         # Loop through the table columns to ensure valid column names were inputted 
         for select_condition in select_conditions: 
-            print("\nThis is the select condition being dissected to look for an aggregation function.")
-            print(select_condition.strip())
+            if select_condition != "*":
+                print("\nThis is the select condition being dissected to look for an aggregation function.")
+                print(select_condition.strip())
 
-            select_condition = select_condition.strip()
+                select_condition = select_condition.strip()
 
-            # Identify the column first 
-            identified_column = ""
-            found_column = False
-            select_df_columns = list(select_df.columns)
-            for column in select_df_columns: 
-                if column in select_condition: 
-                    identified_column = column
-                    found_column = True
-            
-            if not found_column: 
-                print("\nNo valid column could be identified in the phrase:\n", select_condition)
-                print("These are the valid column names for this table so far. Capitalization does matter for column names.")
-                print(select_df_columns)
-                identified_column = None
-                return ""
-            
-            column_and_operation_phrase = select_condition.lower()
-            if "sum" in column_and_operation_phrase: 
-                print("\nAggregating attribute", identified_column , "via sum")
-                valid_select_conditions[identified_column] = "sum"
-            elif "mean" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via mean or average")
-                valid_select_conditions[identified_column] = "mean"
-            elif "max" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via max")
-                valid_select_conditions[identified_column] = "max"
-            elif "min" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via min")
-                valid_select_conditions[identified_column] = "min"
-            elif "count" in column_and_operation_phrase:
-                print("\nAggregating attribute", identified_column , "via count")
-                valid_select_conditions[identified_column] = "count"
+                # Identify the column first 
+                identified_column = ""
+                found_column = False
+                select_df_columns = list(select_df.columns)
+                for column in select_df_columns: 
+                    if column in select_condition: 
+                        identified_column = column
+                        found_column = True
+                
+                if not found_column: 
+                    print("\nNo valid column could be identified in the phrase:\n", select_condition)
+                    print("These are the valid column names for this table so far. Capitalization does matter for column names.")
+                    print(select_df_columns)
+                    identified_column = None
+                    return ""
+                
+                column_and_operation_phrase = select_condition.lower()
+                if "sum" in column_and_operation_phrase: 
+                    print("\nAggregating attribute", identified_column , "via sum")
+                    valid_select_conditions[identified_column] = "sum"
+                elif "mean" in column_and_operation_phrase:
+                    print("\nAggregating attribute", identified_column , "via mean or average")
+                    valid_select_conditions[identified_column] = "mean"
+                elif "max" in column_and_operation_phrase:
+                    print("\nAggregating attribute", identified_column , "via max")
+                    valid_select_conditions[identified_column] = "max"
+                elif "min" in column_and_operation_phrase:
+                    print("\nAggregating attribute", identified_column , "via min")
+                    valid_select_conditions[identified_column] = "min"
+                elif "count" in column_and_operation_phrase:
+                    print("\nAggregating attribute", identified_column , "via count")
+                    valid_select_conditions[identified_column] = "count"
             # else: 
             #     print("\nNo valid aggregation operation identified.")
             #     print("These are the valid aggregation functions:")
             #     print("sum, mean, max, min, count")
             #     return ""
 
-        list_of_aggregation_columns = list(valid_select_conditions.keys())
-        if (len(list_of_aggregation_columns) > 0): 
-            print("Proceeding to the aggregation as aggregation columns were identified.")
-            
-            # Check to see if different aggregation operations being performed on the same column
-            for aggregation_column in list_of_aggregation_columns: 
-                if (list_of_aggregation_columns.count(aggregation_column) > 1): 
-                    print("\nThe column", str(aggregation_column), "can only have one aggregation operation performed to it. Please try again.")
-                    return ""
-            
-            # If the checks pass, perform the aggregation
-            print("\nAggregating...")
-            print("Here is the head of the table currently in the execution plan pipeline.\n\n")
-            print(select_df.head())
-            select_dict = select_df.to_dict(orient='records')
-            aggregated_data = {}
+        if valid_select_conditions:
+            list_of_aggregation_columns = list(valid_select_conditions.keys())
+            if (len(list_of_aggregation_columns) > 0): 
+                print("Proceeding to the aggregation as aggregation columns were identified.")
+                
+                # Check to see if different aggregation operations being performed on the same column
+                for aggregation_column in list_of_aggregation_columns: 
+                    if (list_of_aggregation_columns.count(aggregation_column) > 1): 
+                        print("\nThe column", str(aggregation_column), "can only have one aggregation operation performed to it. Please try again.")
+                        return ""
+                
+                # If the checks pass, perform the aggregation
+                print("\nAggregating...")
+                print("Here is the head of the table currently in the execution plan pipeline.\n\n")
+                print(select_df.head())
+                select_dict = select_df.to_dict(orient='records')
+                aggregated_data = {}
 
-            for aggregation_column in valid_select_conditions: 
-                if valid_select_conditions[aggregation_column] == "sum": 
-                    aggregated_data[aggregation_column + "_sum"] = sum(row[aggregation_column] for row in select_dict)
-                    print("Aggregation of sum complete on the attribute", aggregation_column)
-                elif valid_select_conditions[aggregation_column] == "mean": 
-                    aggregated_data[aggregation_column + "_mean"] = sum(row[aggregation_column] for row in select_dict) / len(select_dict)
-                    print("Aggregation of mean complete on the attribute", aggregation_column)
-                elif valid_select_conditions[aggregation_column] == "max": 
-                    aggregated_data[aggregation_column + "_max"] = max(row[aggregation_column] for row in select_dict)
-                    print("Aggregation of max complete on the attribute", aggregation_column)
-                elif valid_select_conditions[aggregation_column] == "min": 
-                    aggregated_data[aggregation_column + "_min"] = min(row[aggregation_column] for row in select_dict)
-                    print("Aggregation of min complete on the attribute", aggregation_column)
-                elif valid_select_conditions[aggregation_column] == "count": 
-                    length = 0
-                    for row in select_dict: 
-                        if pd.notnull(row[aggregation_column]): 
-                            length +=1 
-                    aggregated_data[aggregation_column + "_count"] = length
-                    print("Aggregation of count complete on the attribute", aggregation_column)
+                for aggregation_column in valid_select_conditions: 
+                    if valid_select_conditions[aggregation_column] == "sum": 
+                        aggregated_data[aggregation_column + "_sum"] = sum(row[aggregation_column] for row in select_dict)
+                        print("Aggregation of sum complete on the attribute", aggregation_column)
+                    elif valid_select_conditions[aggregation_column] == "mean": 
+                        aggregated_data[aggregation_column + "_mean"] = sum(row[aggregation_column] for row in select_dict) / len(select_dict)
+                        print("Aggregation of mean complete on the attribute", aggregation_column)
+                    elif valid_select_conditions[aggregation_column] == "max": 
+                        aggregated_data[aggregation_column + "_max"] = max(row[aggregation_column] for row in select_dict)
+                        print("Aggregation of max complete on the attribute", aggregation_column)
+                    elif valid_select_conditions[aggregation_column] == "min": 
+                        aggregated_data[aggregation_column + "_min"] = min(row[aggregation_column] for row in select_dict)
+                        print("Aggregation of min complete on the attribute", aggregation_column)
+                    elif valid_select_conditions[aggregation_column] == "count": 
+                        length = 0
+                        for row in select_dict: 
+                            if pd.notnull(row[aggregation_column]): 
+                                length +=1 
+                        aggregated_data[aggregation_column + "_count"] = length
+                        print("Aggregation of count complete on the attribute", aggregation_column)
 
-            # Convert the aggregated data back to a DataFrame
-            select_df = pd.DataFrame(aggregated_data, index=[0])
+                # Convert the aggregated data back to a DataFrame
+                select_df = pd.DataFrame(aggregated_data, index=[0])
 
-            print("\nHere is the head of the table currently in the execution plan pipeline after aggregation.\n\n")
-            print(select_df.head())
+                print("\nHere is the head of the table currently in the execution plan pipeline after aggregation.\n\n")
+                print(select_df.head())
 
+            else: 
+                print("\nNo aggregation operations identified either.")
+                print("Proceeding to the next operator in the query execution plan, the sorting operator.")
         else: 
             print("\nNo aggregation operations identified either.")
             print("Proceeding to the next operator in the query execution plan, the sorting operator.")
-
     # Now check for ordering conditions
     # If ordering conditions exist, execute the ordering operator
     if order_by_matches: 
@@ -742,6 +746,49 @@ def selectData():
         validated_select_conditions = []
         available_select_df_columns = list(select_df.columns)
         # Loop through the table columns to ensure valid column names were inputted 
+        contains_all_columns_project_asterik = "*" in select_conditions
+        # contains_all_columns_project_asterik = any("*" in item for item in select_conditions)
+
+        # If the * is there, directly save the output and exit.
+        if contains_all_columns_project_asterik:
+            print("\nAll the existing data has been projected.")
+            print("Here is the head of the table in the query execution pipeline.")
+            print(select_df.head())
+
+            print("\n\nThe selection process is complete!")
+
+            print("\nHere is the head of the final output.")
+            print(select_df.head())
+
+            print("\nHere is the final output.")
+            print(select_df)
+
+            print("\nSaving the output table to the directory named Select-Output-Data/ if you would like to further explore it.")
+
+            output_table_path = "./Select-Output-Data"
+            table_name = "/output_results"
+            if not os.path.exists(output_table_path):
+                os.makedirs(output_table_path)
+            
+            print("\nSaving...")
+            select_df.to_csv(output_table_path + table_name  + ".csv")
+            available_ram_gb = psutil.virtual_memory()[1]/1000000000
+            print('RAM Available (GB):', available_ram_gb)
+            memory_size = int(available_ram_gb * 1000)
+            for i, chunk in enumerate(pd.read_csv(output_table_path + table_name + ".csv", chunksize=memory_size)):
+                if not os.path.exists(output_table_path + table_name):
+                    os.makedirs(output_table_path + table_name)
+                new_file_name = output_table_path + table_name + '/chunk{}.csv'.format(i)
+                chunk.to_csv(new_file_name, index=False)
+            os.remove(output_table_path + table_name + ".csv")
+            print("Saved.")
+            print("\n\nThe select operation is now complete. Hope you enjoyed using the database!")
+
+            print("\nDone with the projection process.")
+
+            return ""
+
+
         for select_condition in select_conditions: 
             print("\nThis is the select condition being checked.")
             print(select_condition.strip())
@@ -768,6 +815,7 @@ def selectData():
                 print(select_df_columns)
                 identified_column = None
                 return ""
+
         
         print("\nHere is a list of the columns that will be projected in the final output.")
         print(validated_select_conditions)
@@ -818,362 +866,7 @@ def selectData():
     os.remove(output_table_path + table_name + ".csv")
     print("Saved.")
     print("\n\nThe select operation is now complete. Hope you enjoyed using the database!")
-
-        # If two group by conditions identified
-        # elif (len(list(valid_select_conditions.keys())) > 1):
-        #     group_by_attribute = group_by_matches[0]
-        #     sub_group_by_attribute = group_by_matches[1]
-        #     value_attribute = list(valid_select_conditions.keys())[0]
-        #     sub_value_attribute = list(valid_select_conditions.keys())[1]
-        #     print("\nGrouping by the two group by attributes:", str(group_by_matches))
-        #     select_dict = select_df.to_dict(orient="records")
-
-        #     grouped_data = {}
-        #     for row in select_dict:
-        #         category = row[group_by_attribute]
-        #         subcategory = row[sub_group_by_attribute]
-        #         value = row[value_attribute]
-
-        #         category_key = (category,)
-        #         subcategory_key = (category, subcategory)
-
-        #         if valid_select_conditions[aggregation_attribute] == "mean":
-        #             print("\nOuter Grouping by the mean.")
-
-
-
-        #         elif valid_select_conditions[aggregation_attribute] == "sum":
-        #             print("\nGrouping by the sum.")
-        #             if category not in grouped_data:
-        #                 grouped_data[category] = {name_of_aggregation_operation: value}
-        #             else:
-        #                 grouped_data[category][name_of_aggregation_operation] += value
-        #             print(grouped_data)
-        #         elif valid_select_conditions[aggregation_attribute] == "count":
-        #             print("\nGrouping by the count.")
-        #             if category not in grouped_data:
-        #                 grouped_data[category] = {name_of_aggregation_operation: 1}
-        #             else:
-        #                 grouped_data[category][name_of_aggregation_operation] += 1
-        #             print(grouped_data)
-        #         elif valid_select_conditions[aggregation_attribute] == "max":
-        #             print("\nGrouping by the max.")
-        #             if category not in grouped_data:
-        #                 grouped_data[category] = {name_of_aggregation_operation: value}
-        #             else:
-        #                 grouped_data[category][name_of_aggregation_operation] = max(grouped_data[category][name_of_aggregation_operation], value)
-                    
-        #             print(grouped_data)
      
-        #         elif valid_select_conditions[aggregation_attribute] == "min":
-        #             print("\nGrouping by the min.")
-        #             if category not in grouped_data:
-        #                 grouped_data[category] = {name_of_aggregation_operation: value}
-        #             else:
-        #                 grouped_data[category][name_of_aggregation_operation] = min(grouped_data[category][name_of_aggregation_operation], value)
-
-
-
-
-
-
-
-
-
-    # # Group By On The table
-    # # Check if there is group by 
-    # select_df_columns = [column for column in list(select_df.columns)]
-    # verified_group_by_columns = []
-    # column_and_aggregation = {}
-    # print("\nTesting")
-    # print(group_by_matches)
-    # print(type(group_by_matches))
-    # if group_by_matches: 
-    #     group_by_matches = group_by_matches[0]
-    #     print(group_by_matches)
-    #     # Need to split the different group by attributes if there are multiple
-    #     if "," in group_by_matches: 
-    #         print("split")
-    #         group_by_matches = group_by_matches.split(",")
-    #     else: 
-    #         group_by_matches = [group_by_matches]
-
-    #     for group_by in group_by_matches:
-    #         print("\n\nIdentifed group by attribute:\n", group_by)
-    #         group_by = group_by.strip()
-    #         if group_by in select_df_columns: 
-    #             print("This attribute", group_by, "is a valid column in the table.")
-    #             verified_group_by_columns.append(group_by.strip())
-    #         else: 
-    #             print("This attribute", group_by, "is not a valid column in the table.")
-    #             print("Exiting. Please enter a valid attribute name.")
-    #             print("Here is a list of valid attriubtes to group on:")
-    #             print(select_df_columns)
-    #             return ""
-            
-    #     print("\nThere must be a valid aggregation function accompanying the group by.")
-    #     print("Checking for an aggregation function.")
-    #     # Check for the aggregation function in the SELECT/projection condition
-    #     select_conditions = str(select_match[1]).split("and")
-    #     print(select_conditions)
-    #     # Loop through the table columns to ensure valid column names were inputted 
-    #     for select_condition in select_conditions: 
-    #         print("\nThis is the select condition being dissected to look for an aggregation function.")
-    #         print(select_condition.strip())
-
-    #         column_and_operation_phrase = select_condition.strip()
-
-    #         # Identify the appropriate column
-    #         identified_column = ""
-    #         found_column = False
-    #         for column in select_df_columns: 
-    #             if column in column_and_operation_phrase: 
-    #                 identified_column = column
-    #                 found_column = True
-            
-    #         if not found_column: 
-    #             print("\nNo valid column could be identified in the phrase:\n", column_and_operation_phrase)
-    #             print("These are the valid column names for this table so far. Capitalization does matter for column names.")
-    #             print(select_df_columns)
-    #             identified_column = None
-    #             return ""
-            
-    #         column_and_operation_phrase = column_and_operation_phrase.lower()
-    #         if "sum" in column_and_operation_phrase: 
-    #             print("\nAggregating attribute", identified_column , "via sum")
-    #             column_and_aggregation[identified_column] = "sum"
-    #         elif "mean" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via mean or average")
-    #             column_and_aggregation[identified_column] = "mean"
-    #         elif "max" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via max")
-    #             column_and_aggregation[identified_column] = "max"
-    #         elif "min" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via min")
-    #             column_and_aggregation[identified_column] = "min"
-    #         elif "std" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via std")
-    #             column_and_aggregation[identified_column] = "std"
-    #         elif "var" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via var")
-    #             column_and_aggregation[identified_column] = "var"
-    #         elif "count" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via count")
-    #             column_and_aggregation[identified_column] = "count"
-    #         else: 
-    #             print("\nNo valid aggregation operation identified.")
-    #             print("\nNo valid aggregation operation identified.")
-    #             print("These are the valid aggregation functions:")
-    #             print("sum, mean, max, min, std, var, count")
-    #             return ""
-        
-    #     # Once aggregation check passes, different group by if there is one group by or multiple group by attributes 
-    #     column_and_aggregation_str = ', '.join(f"'{key}': {value}" if isinstance(value, list) else f"'{key}': '{value}'" for key, value in column_and_aggregation.items())
-    #     # single group by attribute
-    #     if (len(verified_group_by_columns) == 1): 
-    #         print("\nGrouping and aggregating.")
-    #         print("Here is the statement.")
-    #         print(f"select_df = select_df.groupby('{verified_group_by_columns[0]}').agg({{{column_and_aggregation_str}}})")
-    #         try:
-    #             print()
-    #             select_df = select_df.groupby(verified_group_by_columns[0]).agg(column_and_aggregation)
-    #             print("\nGroup By Complete.")
-    #             print("Here is the output of the group by.")
-    #             print(select_df)
-    #         except: 
-    #             print("There was an error grouping. Please check capitalizations and valid attributes and aggregations please.")
-    #             print("Exiting, please try again.")
-    #             return ""
-
-    #     # multiple group by attributes
-    #     else: 
-    #         print("\nGrouping and aggregating.")
-    #         print("Here is the statement.")
-    #         print(f"select_df = select_df.groupby('{verified_group_by_columns}').agg({{{column_and_aggregation_str}}})")
-    #         try: 
-    #             print(column_and_aggregation_str)
-    #             print()
-    #             select_df.groupby(verified_group_by_columns).agg(column_and_aggregation)
-    #             print("\nGroup By Complete.")
-    #             print("Here is the output of the group by.")
-    #             print(select_df)
-    #         except: 
-    #             print("There was an error grouping. Please check capitalizations and valid attributes and aggregations please.")
-    #             print("Exiting, please try again.")
-    #             return ""
-    # # Non Group By Aggregation 
-    # # If there is no group by, need to check if there is still aggregation 
-    # else: 
-    #     print("\nNo GROUP BY identified. Moving onto aggregation.")
-    #     # If there is no group by, aggregate on columns 
-    #     column_and_aggregation = {}
-    #     print("\nChecking for an aggregation function.")
-    #     # Check for the aggregation function in the SELECT/projection condition
-    #     select_conditions = str(select_match[1]).split("and")
-    #     print(select_conditions)
-    #     # Loop through the table columns to ensure valid column names were inputted 
-    #     for select_condition in select_conditions: 
-    #         print("\nThis is the select condition being dissected to look for an aggregation function.")
-    #         print(select_condition.strip())
-
-    #         column_and_operation_phrase = select_condition.strip()
-
-    #         # Identify the appropriate column
-    #         identified_column = ""
-    #         found_column = False
-    #         for column in select_df_columns: 
-    #             if column in column_and_operation_phrase: 
-    #                 identified_column = column
-    #                 found_column = True
-            
-    #         if not found_column: 
-    #             print("\nNo valid column could be identified in the phrase:\n", column_and_operation_phrase)
-    #             print("These are the valid column names for this table so far. Capitalization does matter for column names.")
-    #             print(select_df_columns)
-    #             identified_column = None
-    #             return ""
-            
-    #         column_and_operation_phrase = column_and_operation_phrase.lower()
-    #         if "sum" in column_and_operation_phrase: 
-    #             print("\nAggregating attribute", identified_column , "via sum")
-    #             column_and_aggregation[identified_column] = "sum"
-    #         elif "mean" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via mean or average")
-    #             column_and_aggregation[identified_column] = "mean"
-    #         elif "max" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via max")
-    #             column_and_aggregation[identified_column] = "max"
-    #         elif "min" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via min")
-    #             column_and_aggregation[identified_column] = "min"
-    #         elif "std" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via std")
-    #             column_and_aggregation[identified_column] = "std"
-    #         elif "var" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via var")
-    #             column_and_aggregation[identified_column] = "var"
-    #         elif "count" in column_and_operation_phrase:
-    #             print("\nAggregating attribute", identified_column , "via count")
-    #             column_and_aggregation[identified_column] = "count"
-    #         else: 
-    #             print("\nNo valid aggregation operation identified.")
-    #             print("\nNo valid aggregation operation identified.")
-    #             print("These are the valid aggregation functions:")
-    #             print("sum, mean, max, min, std, var, count")
-    #             return ""
-            
-    #     print("\nAggregating.")
-    #     print("Here is the statement.")
-    #     print(f"select_df = select_df.agg({{{column_and_aggregation}}})")
-    #     try:
-    #         print()
-    #         select_df = select_df.agg(column_and_aggregation)
-    #         print("\nAggregation Complete.")
-    #         print("Here is the output of the aggregation.")
-    #         print(select_df)
-    #     except: 
-    #         print("\nThere was an error with the aggregation. Please check capitalizations and aggregation-attribute pairings please.")
-    #         print("You can only use aggregations like sum on numerical attributes.")
-    #         print("Exiting, please try again.")
-    #         return ""
-    
-    # print("\nGrouping and Aggregation Complete")
-
-    # # Ordering
-    # select_df_columns = list(select_df.columns)
-    # ordering_dict = {}
-    # if order_by_matches: 
-    #     print("\n\n\nChecking for ordering conditions.")
-    #     for order_by in order_by_matches: 
-    #         print("Identified the ordering condition:\n", order_by)
-    #         order_by = order_by.split(" ")
-    #         attribute = order_by[0].strip()
-    #         ordering = order_by[1].strip().lower()
-    #         print(attribute)
-    #         print(ordering)
-    #         if (ordering == "ascending"): 
-    #             print("Identified the ordering as ascending.")
-    #             order = True
-    #         elif (ordering == "descending"): 
-    #             print("Identified the ordering as descending.")
-    #             order = False
-    #         else: 
-    #             print("\nCould not identify a valid ordering. Please enter 'ascending' or 'descending' next to the attribute name in any capitalization.")
-    #             print("Exiting, please try again.")
-    #             order = True
-    #             return ""
-
-    #         print("The attribute identified is:\n", attribute)
-    #         identified_column = ""
-    #         found_column = False
-    #         for column in select_df_columns: 
-    #             if column in column_and_operation_phrase: 
-    #                 identified_column = column
-    #                 found_column = True        
-
-    #         if not found_column: 
-    #             print("\nNo valid column could be identified in the phrase:\n", column_and_operation_phrase)
-    #             print("These are the valid column names for this table so far. Capitalization does matter for column names.")
-    #             print(select_df_columns)
-    #             identified_column = None
-    #             return ""
-
-    #         ordering_dict[attribute] = order
-
-    #     print("\nOrdering.")
-    #     print("Here is the statement.")
-    #     # sort_values differs for ordering by a single and multiple columns 
-    #     if (len(ordering_dict) == 1):
-    #         print(f"select_df = select_df.sort_values(by='{attribute}', ascending={ordering_dict[attribute]})")
-    #         try:
-    #             print()
-    #             print(attribute)
-    #             print(bool(ordering_dict[attribute]))
-    #             select_df = select_df.sort_values(by=attribute, ascending=bool(ordering_dict[attribute]))
-    #             print("\nOrdering Complete.")
-    #             print("Here is the output of the ordering.")
-    #             print(select_df)
-    #         except: 
-    #             try: 
-    #                 select_df = select_df.sort_values(ascending=bool(ordering_dict[attribute]))
-    #                 print("\nOrdering Complete.")
-    #                 print("Here is the output of the ordering.")
-    #                 print(select_df)
-    #             except:
-    #                 print("\nThere was an error with the ordering. Please check capitalizations and ascending/descending please.")
-    #                 print("\nOne potential error could also be that there are too many order by attributes relative to the columns after the filtering, grouping, and aggregation.")
-    #                 print("Exiting, please try again.")
-    #                 return ""
-    #     else: 
-    #         ordering_keys = list(ordering_dict.keys())
-    #         ordering_values = list(ordering_dict.values())
-    #         print(f"select_df = select_df.sort_values(by={ordering_keys}, ascending={ordering_values})")
-    #         try:
-    #             print()
-    #             select_df = select_df.sort_values(by=ordering_keys, ascending=ordering_values)
-    #             print("\nOrdering Complete.")
-    #             print("Here is the output of the ordering.")
-    #             print(select_df)
-    #         except: 
-    #             try:
-    #                 print()
-    #                 select_df = select_df.sort_values(by=ordering_keys, ascending=ordering_values)
-    #                 print("\nOrdering Complete.")
-    #                 print("Here is the output of the ordering.")
-    #                 print(select_df)
-    #             except: 
-    #                 print("\nThere was an error with the ordering. Please check capitalizations and ascending/descending please.")
-    #                 print("\nOne potential error could also be that there are too many order by attributes relative to the columns after the filtering, grouping, and aggregation.")
-    #                 print("There are", len(ordering_keys), "attributes to order by.")
-    #                 print("However, the table only has", len(list(select_df.columns)), "columns.")
-    #                 print("Exiting, please try again.")
-    #                 return ""
-
-    # # Projection
-    # select_df_columns = list(select_df.columns)
-    # if select_match: 
-    #     print("\n\n\nProjecting.")
-
 def updateData(): 
     # Display the example prompts for the user
     print("\nHere are 2 example prompts to update data in the database. Use a semicolon ';' to end the command.")
