@@ -361,81 +361,93 @@ def selectData():
                 print(list(select_df.columns))
                 return ""
             
+            if filter_condition_operator == "=":
+                try:
+                    if (filter_condition_value.isdecimal()):
+                        filter_condition_value = int(filter_condition_value)
+                    else: 
+                        filter_condition_value = float(filter_condition_value)
+                    print(f"Converted to number: {filter_condition_value}")
+                except:
+                    # If it's not a valid integer, try converting to a float
+                    print(f"Not converted to number. Kept value as string: {filter_condition_value}")
+            elif filter_condition_operator == "<":
+                try:
+                    if (filter_condition_value.isdecimal()):
+                        filter_condition_value = int(filter_condition_value)
+                    else: 
+                        filter_condition_value = float(filter_condition_value)
+                    print(f"Converted to number: {filter_condition_value}")
+                except:
+                    # If it's not a valid integer, try converting to a float
+                    print(f"Not converted to number. Kept value as string: {filter_condition_value}")
+            elif filter_condition_operator == "<=":
+                try:
+                    if (filter_condition_value.isdecimal()):
+                        filter_condition_value = int(filter_condition_value)
+                    else: 
+                        filter_condition_value = float(filter_condition_value)
+                    print(f"Converted to number: {filter_condition_value}")
+                except:
+                    # If it's not a valid integer, try converting to a float
+                    print(f"Not converted to number. Kept value as string: {filter_condition_value}")
+            elif filter_condition_operator == ">":
+                try:
+                    if (filter_condition_value.isdecimal()):
+                        filter_condition_value = int(filter_condition_value)
+                    else: 
+                        filter_condition_value = float(filter_condition_value)
+                    print(f"Converted to number: {filter_condition_value}")
+                except:
+                    # If it's not a valid integer, try converting to a float
+                    print(f"Not converted to number. Kept value as string: {filter_condition_value}")
+            elif filter_condition_operator == ">=":
+                try:
+                    if (filter_condition_value.isdecimal()):
+                        filter_condition_value = int(filter_condition_value)
+                    else: 
+                        filter_condition_value = float(filter_condition_value)
+                    print(f"Converted to number: {filter_condition_value}")
+                except:
+                    # If it's not a valid integer, try converting to a float
+                    print(f"Not converted to number. Kept value as string: {filter_condition_value}")
+            elif filter_condition_operator == "!=":
+                try:
+                    if (filter_condition_value.isdecimal()):
+                        filter_condition_value = int(filter_condition_value)
+                    else: 
+                        filter_condition_value = float(filter_condition_value)
+                    print(f"Converted to number: {filter_condition_value}")
+                except:
+                    # If it's not a valid integer, try converting to a float
+                    print(f"Not converted to number. Kept value as string: {filter_condition_value}")
+            else: 
+                print("\nNo appropriate filter condition operator found. Please try again. An example operator is 'greater than'")
+                return ""
+            
             # Loop through the dataframe and filter out the rows 
             select_dict = select_df.to_dict(orient="records")
             
             filtered_select_dict = []
             for row in select_dict: 
                 if filter_condition_operator == "=":
-                    try:
-                        if (filter_condition_value.isdecimal()):
-                            filter_condition_value = int(filter_condition_value)
-                        else: 
-                            filter_condition_value = float(filter_condition_value)
-                        print(f"Converted to number: {filter_condition_value}")
-                    except:
-                        # If it's not a valid integer, try converting to a float
-                        print(f"Not converted to number. Kept value as string: {filter_condition_value}")
                     if (row[filter_condition_attribute] == filter_condition_value):
                         filtered_select_dict.append(row)
                 elif filter_condition_operator == "<":
-                    try:
-                        if (filter_condition_value.isdecimal()):
-                            filter_condition_value = int(filter_condition_value)
-                        else: 
-                            filter_condition_value = float(filter_condition_value)
-                        print(f"Converted to number: {filter_condition_value}")
-                    except:
-                        # If it's not a valid integer, try converting to a float
-                        print(f"Not converted to number. Kept value as string: {filter_condition_value}")
                     if (row[filter_condition_attribute] < filter_condition_value):
                         filtered_select_dict.append(row)
                 elif filter_condition_operator == "<=":
-                    try:
-                        if (filter_condition_value.isdecimal()):
-                            filter_condition_value = int(filter_condition_value)
-                        else: 
-                            filter_condition_value = float(filter_condition_value)
-                        print(f"Converted to number: {filter_condition_value}")
-                    except:
-                        # If it's not a valid integer, try converting to a float
-                        print(f"Not converted to number. Kept value as string: {filter_condition_value}")
                     if (row[filter_condition_attribute] <= filter_condition_value):
                         filtered_select_dict.append(row)
                 elif filter_condition_operator == ">":
-                    try:
-                        if (filter_condition_value.isdecimal()):
-                            filter_condition_value = int(filter_condition_value)
-                        else: 
-                            filter_condition_value = float(filter_condition_value)
-                        print(f"Converted to number: {filter_condition_value}")
-                    except:
-                        # If it's not a valid integer, try converting to a float
-                        print(f"Not converted to number. Kept value as string: {filter_condition_value}")
                     if (row[filter_condition_attribute] > filter_condition_value):
+                        print(row[filter_condition_attribute])
+                        print(filter_condition_value)
                         filtered_select_dict.append(row)
                 elif filter_condition_operator == ">=":
-                    try:
-                        if (filter_condition_value.isdecimal()):
-                            filter_condition_value = int(filter_condition_value)
-                        else: 
-                            filter_condition_value = float(filter_condition_value)
-                        print(f"Converted to number: {filter_condition_value}")
-                    except:
-                        # If it's not a valid integer, try converting to a float
-                        print(f"Not converted to number. Kept value as string: {filter_condition_value}")
                     if (row[filter_condition_attribute] >= filter_condition_value):
                         filtered_select_dict.append(row)
                 elif filter_condition_operator == "!=":
-                    try:
-                        if (filter_condition_value.isdecimal()):
-                            filter_condition_value = int(filter_condition_value)
-                        else: 
-                            filter_condition_value = float(filter_condition_value)
-                        print(f"Converted to number: {filter_condition_value}")
-                    except:
-                        # If it's not a valid integer, try converting to a float
-                        print(f"Not converted to number. Kept value as string: {filter_condition_value}")
                     if (row[filter_condition_attribute] != filter_condition_value):
                         filtered_select_dict.append(row)
                 elif filter_condition_operator == "LIKE":
@@ -447,6 +459,7 @@ def selectData():
             
             print("\nDone filtering on the filter condition:", str(filter_condition))
             print("Here is a sample of the new table so far.")
+            select_df = pd.DataFrame(filtered_select_dict)
             print(select_df.head())
 
         print("\nDone with the filtering process. Proceeding to the next operator in the query execution plan, the aggregation operator.")
