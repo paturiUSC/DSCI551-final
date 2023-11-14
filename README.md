@@ -9,4 +9,4 @@
 # to-do
 - Select
     - Add * for projection
-    - group by, ordering, projection
+    - ordering, projection
