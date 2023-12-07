@@ -1,5 +1,6 @@
 # DSCI551-final
 
+<<<<<<< HEAD
 # ./Data/all_stocks_5yr.csv
 
 # find (sum stock open) in (all_stocks_5yr);
@@ -27,3 +28,13 @@
 # delete all from ge_stock;
 
 # delete all from all_stocks_5yr;
+=======
+-	Is it ok if pandas changes dtype from int to float when reading in the .csv file?
+-	Is it ok to use pandas for insert and delete and update stuff?
+-	Tables should be case sensitive but test this 
+- Do we need to join where the column name on the left and column name on the right could be different and join on multiple attributes?
+- Is grouping by at most 1 attribute enough?
+
+# to-do
+  - connect the scripts together
+>>>>>>> 5f69a839f76187484155e827324e6dba9fbcfa55
