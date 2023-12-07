@@ -1,6 +1,5 @@
 # DSCI551-final
 
-<<<<<<< HEAD
 # ./Data/all_stocks_5yr.csv
 
 # find (sum stock open) in (all_stocks_5yr);
